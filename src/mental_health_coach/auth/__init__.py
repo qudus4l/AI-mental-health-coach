@@ -1,0 +1,1 @@
+"""Authentication package for the mental health coach application.""" 

@@ -1,100 +1,95 @@
 # AI Mental Health Coach
 
-An AI-powered mental health coaching platform that provides support for anxiety and depression through text-based conversations, maintains contextual memory across sessions, and delivers structured therapeutic interventions using evidence-based approaches.
+An AI-powered mental health coaching platform that provides support for anxiety and depression through voice-enabled conversations, maintains contextual memory across sessions, and delivers structured therapeutic interventions using evidence-based approaches.
 
-## Phase 1: Text-Based Coach MVP
+## Features
 
-This is the initial implementation of the AI Mental Health Coach focusing on:
-
-- Web app with text chat interface
-- User authentication (email/social login)
-- Conversation storage
-- Important memory tracking
-- CBT-based AI coaching
-- Homework assignment features
-
-## Tech Stack
-
-- **Backend:** TypeScript + Node 18, Fastify, Prisma ORM, PostgreSQL
-- **LLM Integration:** OpenAI API
-- **Frontend:** Next.js 14, React 18, Tailwind CSS
-- **Authentication:** NextAuth.js (email + Google)
-- **Testing:** Vitest + Supertest (API) and React Testing Library (UI)
-- **DevOps:** Docker Compose, GitHub Actions CI
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18 or later
-- Docker and Docker Compose
-- OpenAI API key
-
-### Installation
-
-1. Clone the repository
-2. Copy `.env.example` to `.env` and fill in the required environment variables
-3. Install dependencies:
-
-```bash
-npm install
-```
-
-4. Start the development environment:
-
-```bash
-docker-compose up --build
-```
-
-The application will be available at:
-- Web app: http://localhost:3000
-- API: http://localhost:3001
-
-### Development
-
-```bash
-# Start development servers
-npm run dev
-
-# Run tests
-npm run test
-
-# Run linting
-npm run lint
-
-# Build for production
-npm run build
-
-# Seed the database with demo data
-npm run db:seed
-```
-
-## Future Phases
-
-### Phase 2: Voice Integration
-
-- Browser-based speech-to-text/text-to-speech
-- Voice conversation capabilities
-- Conversation transcription
-
-### Phase 3: Session Structure & Safety
-
-- Session scheduling
-- Formal vs casual chat distinction
-- Crisis detection improvements
-- Homework tracking enhancements
+- 24/7 access to mental health support
+- Voice-enabled conversations for natural interaction
+- Personalized memory that remembers progress, triggers, and coping strategies
+- Structured support combining casual chat with formal therapeutic sessions
+- Evidence-based approaches using CBT and behavioral activation techniques
+- Progressive care with homework assignments and progress tracking
 
 ## Project Structure
 
 ```
-apps/web      # Next.js frontend application
-apps/api      # Fastify backend API
-packages/db   # Prisma schema & database migrations
-packages/core # Shared types, memory utils, CBT prompts
-docs/         # Documentation
-compliance/   # Compliance documentation (placeholder)
+AI-mental-health-coach/
+├── src/                   # Source code
+│   └── mental_health_coach/   # Main package
+│       ├── api/           # API endpoints
+│       ├── auth/          # Authentication functionality
+│       ├── models/        # Database models
+│       ├── schemas/       # Pydantic schemas
+│       ├── services/      # Business logic services
+│       └── voice/         # Voice processing functionality
+├── tests/                 # Test suite
+├── docs/                  # Documentation
+├── config/                # Configuration files
+└── scripts/               # Utility scripts
 ```
+
+## Development Setup
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js (for web interface)
+- Optional: Audio dependencies for voice features
+  - PyAudio
+  - SpeechRecognition
+  - pyttsx3
+
+### Installation
+
+1. Clone the repository:
+   ```
+   git clone [repository-url]
+   cd AI-mental-health-coach
+   ```
+
+2. Set up virtual environment:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```
+   pip install -e .
+   ```
+
+4. Set up environment variables:
+   ```
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+### Running the Application
+
+For development:
+```
+python -m src.mental_health_coach.app
+```
+
+### Running Tests
+
+```
+pytest
+```
+
+## Voice Conversation API
+
+The platform includes a WebSocket-based API for voice conversations:
+
+- `/api/voice/conversations` - Start a new voice conversation
+- `/api/voice/conversations/{id}/end` - End a voice conversation
+- `/api/voice/ws/{user_id}` - WebSocket endpoint for real-time voice communication
 
 ## License
 
-Proprietary - All Rights Reserved 
+[License information]
+
+## Contributors
+
+[Contributor information] 

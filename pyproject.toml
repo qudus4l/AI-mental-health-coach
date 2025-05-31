@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mental_health_coach"
+version = "0.1.0"
+description = "AI-powered mental health coaching platform"
+readme = "README.md"
+authors = [
+    {name = "AI Mental Health Coach Team"}
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.dependencies]
+fastapi = "^0.104.0"
+uvicorn = "^0.23.2"
+pydantic = "^2.4.2"
+sqlalchemy = "^2.0.22"
+python-dotenv = "^1.0.0"
+passlib = "^1.7.4"
+python-jose = "^3.3.0"
+bcrypt = "^4.0.1"
+alembic = "^1.12.0"
+pytest = "^7.4.2"
+pytest-cov = "^4.1.0"
+ruff = "^0.1.1"
+mypy = "^1.6.1"
+black = "^23.10.0"
+websockets = "^12.0.0"
+pytest-mock = "^3.11.1"
+
+# Voice processing dependencies (optional)
+# PyAudio will be required for actual audio recording/playback
+# PyAudio = "^0.2.13"
+# SpeechRecognition = "^3.10.0"
+# pyttsx3 = "^2.90"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+select = ["E", "F", "B", "I", "C4", "SIM", "UP"]
+ignore = []
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*" 
