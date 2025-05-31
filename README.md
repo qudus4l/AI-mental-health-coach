@@ -1,54 +1,40 @@
 # AI Mental Health Coach
 
-An AI-powered mental health coaching platform that provides support for anxiety and depression through voice-enabled conversations, maintains contextual memory across sessions, and delivers structured therapeutic interventions using evidence-based approaches.
+An AI-powered mental health coaching platform designed to provide support for anxiety and depression through conversational AI.
 
 ## Features
 
-- 24/7 access to mental health support
-- Voice-enabled conversations for natural interaction
-- Personalized memory that remembers progress, triggers, and coping strategies
-- Structured support combining casual chat with formal therapeutic sessions
-- Evidence-based approaches using CBT and behavioral activation techniques
-- Progressive care with homework assignments and progress tracking
+- **Conversation System**: Text-based chat interface with AI-generated responses
+- **Memory Management**: Remembers important details from past conversations using RAG (Retrieval Augmented Generation)
+- **Crisis Detection**: Identifies potential crisis situations and provides appropriate resources
+- **Therapeutic Framework**: Based on Cognitive Behavioral Therapy (CBT) principles
+- **Session Management**: Distinguishes between formal therapy sessions and casual chats
+- **Emergency Contact System**: Manages emergency contacts and crisis notifications
 
-## Project Structure
+## Technical Stack
 
-```
-AI-mental-health-coach/
-├── src/                   # Source code
-│   └── mental_health_coach/   # Main package
-│       ├── api/           # API endpoints
-│       ├── auth/          # Authentication functionality
-│       ├── models/        # Database models
-│       ├── schemas/       # Pydantic schemas
-│       ├── services/      # Business logic services
-│       └── voice/         # Voice processing functionality
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-├── config/                # Configuration files
-└── scripts/               # Utility scripts
-```
+- **Backend**: FastAPI, SQLAlchemy, Pydantic
+- **Database**: SQLite (development), PostgreSQL (production)
+- **LLM Integration**: OpenAI's `gpt-4.1-mini-2025-04-14` model
+- **Memory System**: TF-IDF based retrieval for conversation context
+- **Authentication**: JWT-based authentication
 
-## Development Setup
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js (for web interface)
-- Optional: Audio dependencies for voice features
-  - PyAudio
-  - SpeechRecognition
-  - pyttsx3
+- Python 3.9+
+- OpenAI API key
 
 ### Installation
 
 1. Clone the repository:
    ```
-   git clone [repository-url]
-   cd AI-mental-health-coach
+   git clone https://github.com/yourusername/ai-mental-health-coach.git
+   cd ai-mental-health-coach
    ```
 
-2. Set up virtual environment:
+2. Create and activate a virtual environment:
    ```
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -56,40 +42,61 @@ AI-mental-health-coach/
 
 3. Install dependencies:
    ```
-   pip install -e .
+   pip install -r requirements.txt
    ```
 
 4. Set up environment variables:
    ```
-   cp .env.example .env
-   # Edit .env with your configuration
+   cp env.example .env
+   ```
+   Edit `.env` to add your OpenAI API key and other configuration.
+
+5. Initialize the database:
+   ```
+   alembic upgrade head
    ```
 
-### Running the Application
+6. Run the application:
+   ```
+   uvicorn src.mental_health_coach.app:app --reload
+   ```
 
-For development:
-```
-python -m src.mental_health_coach.app
-```
+7. Open the API documentation at http://localhost:8000/docs
 
-### Running Tests
+## Usage
 
-```
-pytest
-```
+1. Register a user account using the `/api/users/` endpoint
+2. Log in to get an access token with `/api/auth/login`
+3. Create a conversation with `/api/conversations/`
+4. Send messages to the conversation with `/api/conversations/{id}/messages`
 
-## Voice Conversation API
+## LLM Integration
 
-The platform includes a WebSocket-based API for voice conversations:
+The system uses OpenAI's `gpt-4.1-mini-2025-04-14` model to generate responses:
 
-- `/api/voice/conversations` - Start a new voice conversation
-- `/api/voice/conversations/{id}/end` - End a voice conversation
-- `/api/voice/ws/{user_id}` - WebSocket endpoint for real-time voice communication
+- When a user sends a message, the system performs crisis detection
+- If no crisis is detected, the LLM generates a therapeutic response
+- The system extracts important memories from the conversation
+- Context from past conversations is retrieved using RAG to improve responses
+
+To use your own model:
+1. Set the `OPENAI_API_KEY` in your `.env` file
+2. Optionally modify the model name in `src/mental_health_coach/services/llm_service.py`
+
+## Project Structure
+
+- `src/mental_health_coach/`: Main package
+  - `api/`: API endpoints and routers
+  - `models/`: Database models
+  - `schemas/`: Pydantic schemas for validation
+  - `services/`: Business logic and services
+    - `rag/`: Retrieval Augmented Generation system
+    - `crisis_detection.py`: Crisis detection service
+    - `emergency_contact.py`: Emergency contact management
+    - `llm_service.py`: LLM integration service
+  - `auth/`: Authentication and security
+  - `app.py`: Main application entry point
 
 ## License
 
-[License information]
-
-## Contributors
-
-[Contributor information] 
+[MIT License](LICENSE) 

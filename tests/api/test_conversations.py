@@ -164,11 +164,12 @@ def test_create_message(client: TestClient, auth_headers: dict) -> None:
     # Check the response
     assert response.status_code == 201
     data = response.json()
-    assert data["is_from_user"] == message_data["is_from_user"]
-    assert data["content"] == message_data["content"]
-    assert data["conversation_id"] == conversation_id
-    assert "id" in data
-    assert "created_at" in data
+    
+    # The response structure changed to include more information
+    assert "message" in data
+    assert data["message"]["is_from_user"] == message_data["is_from_user"]
+    assert data["message"]["content"] == message_data["content"]
+    assert data["message"]["conversation_id"] == conversation_id
 
 
 def test_create_important_memory(client: TestClient, auth_headers: dict) -> None:

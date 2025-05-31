@@ -4,7 +4,9 @@ This module provides functionality for detecting potential crisis situations
 in user messages and providing appropriate responses.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Any
+import re
+from collections import Counter
 
 # Crisis keywords grouped by category
 CRISIS_KEYWORDS: Dict[str, List[str]] = {
@@ -135,22 +137,27 @@ class CrisisDetector:
         self.crisis_keywords = crisis_keywords or CRISIS_KEYWORDS
         self.emergency_resources = emergency_resources or EMERGENCY_RESOURCES
     
-    def detect_crisis(self, message: str) -> Tuple[bool, List[str], List[Dict[str, str]]]:
-        """Detect potential crisis indicators in a message.
+    def detect_crisis(
+        self, message: str, message_history: Optional[List[str]] = None, user_profile: Optional[Dict[str, Any]] = None
+    ) -> Tuple[bool, List[str], List[Dict[str, str]], Dict[str, Any]]:
+        """Detect potential crisis indicators in a message with enhanced context awareness.
         
         Args:
             message: The message to analyze.
+            message_history: Optional list of previous messages for context.
+            user_profile: Optional user profile data for personalized detection.
             
         Returns:
             Tuple containing:
                 - Boolean indicating if a crisis was detected
                 - List of detected crisis categories
                 - List of relevant emergency resources
+                - Dictionary with additional analysis details
         """
         message = message.lower()
         detected_categories = []
         
-        # Check each category for keyword matches
+        # Basic keyword detection (same as before)
         for category, keywords in self.crisis_keywords.items():
             for keyword in keywords:
                 if keyword in message:
@@ -164,14 +171,135 @@ class CrisisDetector:
             elif "harm" in message and ("myself" in message or "self" in message):
                 detected_categories.append("self_harm")
         
+        # Enhanced detection: Pattern recognition
+        additional_analysis = self._perform_advanced_analysis(message, message_history, user_profile)
+        
+        # Check for context patterns that might indicate crisis
+        context_categories = additional_analysis.get("context_categories", [])
+        for category in context_categories:
+            if category not in detected_categories:
+                detected_categories.append(category)
+        
         # If no crisis detected
         if not detected_categories:
-            return False, [], []
+            return False, [], [], additional_analysis
         
         # Get relevant resources
         resources = self.get_resources(detected_categories)
         
-        return True, detected_categories, resources
+        return True, detected_categories, resources, additional_analysis
+    
+    def _perform_advanced_analysis(
+        self, message: str, message_history: Optional[List[str]] = None, user_profile: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Perform advanced analysis on the message to detect subtle crisis indicators.
+        
+        Args:
+            message: The message to analyze.
+            message_history: Optional list of previous messages for context.
+            user_profile: Optional user profile data for personalized detection.
+            
+        Returns:
+            Dictionary containing analysis results.
+        """
+        analysis_results = {
+            "context_categories": [],
+            "pattern_matches": [],
+            "risk_level": "low",
+            "confidence_score": 0.0,
+        }
+        
+        # Pattern matching for indirect expressions of suicidal intent
+        indirect_suicide_patterns = [
+            r"(don't|won't|can't) be (here|around) (anymore|much longer)",
+            r"(saying|say) goodbye",
+            r"(this|it) (is|will be) (my last|the last)",
+            r"(leave|leaving) (this world|everything behind)",
+            r"(tired|exhausted|done) (of|with) (living|life|everything)",
+        ]
+        
+        for pattern in indirect_suicide_patterns:
+            if re.search(pattern, message, re.IGNORECASE):
+                analysis_results["pattern_matches"].append(pattern)
+                if "suicide" not in analysis_results["context_categories"]:
+                    analysis_results["context_categories"].append("suicide")
+        
+        # Check for combination of concerning words
+        concerning_combinations = [
+            (["plan", "die"], "suicide"),
+            (["hurt", "myself", "again"], "self_harm"),
+            (["no", "hope", "future"], "severe_depression"),
+            (["afraid", "home", "hurt"], "domestic_violence"),
+        ]
+        
+        for word_set, category in concerning_combinations:
+            if all(word in message for word in word_set):
+                if category not in analysis_results["context_categories"]:
+                    analysis_results["context_categories"].append(category)
+        
+        # Analyze message history for patterns if available
+        if message_history and len(message_history) > 0:
+            # Join recent history with current message
+            full_text = " ".join(message_history[-5:] + [message])
+            
+            # Count crisis keywords in recent history
+            crisis_word_count = 0
+            all_crisis_words = [word for category_words in self.crisis_keywords.values() for word in category_words]
+            for word in all_crisis_words:
+                if word in full_text:
+                    crisis_word_count += 1
+            
+            # If there's a high density of crisis words across messages, escalate risk
+            if crisis_word_count >= 3:
+                analysis_results["risk_level"] = "medium"
+                analysis_results["confidence_score"] = 0.6
+            
+            # Detect rapid deterioration in mood
+            mood_words_neg = ["worse", "harder", "difficult", "struggling", "can't", "terrible"]
+            mood_words_pos = ["better", "improving", "hopeful", "managing", "coping", "good"]
+            
+            neg_count = sum(word in full_text for word in mood_words_neg)
+            pos_count = sum(word in full_text for word in mood_words_pos)
+            
+            # If negative mood words vastly outnumber positive ones, this could indicate deterioration
+            if neg_count > 3 and neg_count > pos_count * 2:
+                analysis_results["risk_level"] = "medium"
+                analysis_results["confidence_score"] = max(analysis_results["confidence_score"], 0.65)
+        
+        # Consider user profile risk factors if available
+        if user_profile:
+            # Check for high baseline depression/anxiety scores
+            depression_score = user_profile.get("depression_score", 0)
+            anxiety_score = user_profile.get("anxiety_score", 0)
+            
+            if depression_score and depression_score >= 8:  # High depression score
+                if "severe_depression" in analysis_results["context_categories"]:
+                    analysis_results["risk_level"] = "high"
+                    analysis_results["confidence_score"] = max(analysis_results["confidence_score"], 0.8)
+            
+            if anxiety_score and anxiety_score >= 8:  # High anxiety score
+                if "severe_anxiety" in analysis_results["context_categories"]:
+                    analysis_results["risk_level"] = "high"
+                    analysis_results["confidence_score"] = max(analysis_results["confidence_score"], 0.7)
+        
+        # Set confidence based on direct keyword matches
+        if len(analysis_results["context_categories"]) > 0:
+            analysis_results["confidence_score"] = max(analysis_results["confidence_score"], 0.75)
+            analysis_results["risk_level"] = max(analysis_results["risk_level"], "medium", key=self._risk_level_order)
+        
+        return analysis_results
+    
+    def _risk_level_order(self, level: str) -> int:
+        """Helper function to order risk levels.
+        
+        Args:
+            level: Risk level string.
+            
+        Returns:
+            Integer representing the risk level order.
+        """
+        order = {"low": 0, "medium": 1, "high": 2}
+        return order.get(level, 0)
     
     def get_resources(self, categories: List[str]) -> List[Dict[str, str]]:
         """Get emergency resources for the detected crisis categories.
@@ -196,11 +324,12 @@ class CrisisDetector:
         
         return resources
     
-    def get_crisis_response(self, categories: List[str]) -> str:
+    def get_crisis_response(self, categories: List[str], analysis_details: Dict[str, Any] = None) -> str:
         """Generate an appropriate response for the detected crisis.
         
         Args:
             categories: List of detected crisis categories.
+            analysis_details: Optional additional analysis details.
             
         Returns:
             String containing a supportive crisis response.
@@ -251,6 +380,21 @@ class CrisisDetector:
                 "that can provide guidance and support in these situations. "
             )
         
+        # Add risk-level specific guidance if available
+        if analysis_details and "risk_level" in analysis_details:
+            risk_level = analysis_details.get("risk_level")
+            
+            if risk_level == "high":
+                response += (
+                    "Based on what you've shared, I strongly encourage you to reach out for professional help right away. "
+                    "This is not something you need to handle alone, and immediate support is available. "
+                )
+            elif risk_level == "medium":
+                response += (
+                    "It sounds like you're going through a really difficult time. "
+                    "Please consider speaking with a mental health professional soon about what you're experiencing. "
+                )
+        
         # Add a closing statement with the resources introduction
         response += (
             "Below I'm providing some resources that might be helpful. "
@@ -278,4 +422,57 @@ class CrisisDetector:
             formatted += f"  {resource['contact']}\n"
             formatted += f"  {resource['description']}\n\n"
         
-        return formatted 
+        return formatted
+    
+    def get_historical_crisis_indicators(self, message_history: List[str]) -> Dict[str, Any]:
+        """Analyze message history for crisis patterns over time.
+        
+        Args:
+            message_history: List of previous messages.
+            
+        Returns:
+            Dictionary containing historical analysis results.
+        """
+        if not message_history:
+            return {"pattern_found": False}
+        
+        # Flatten all crisis keywords into a single list
+        all_crisis_words = [word for category_words in self.crisis_keywords.values() for word in category_words]
+        
+        # Count occurrences of crisis keywords in each message
+        crisis_word_counts = []
+        for msg in message_history:
+            count = sum(1 for word in all_crisis_words if word in msg.lower())
+            crisis_word_counts.append(count)
+        
+        # Check for increasing pattern of crisis keywords
+        increasing_pattern = False
+        if len(crisis_word_counts) >= 3:
+            # Check if there's a consistent increase in the last few messages
+            if all(crisis_word_counts[-i] <= crisis_word_counts[-i+1] for i in range(3, 1, -1)):
+                increasing_pattern = True
+        
+        # Check for persistence of specific categories
+        category_persistence = {}
+        for category, keywords in self.crisis_keywords.items():
+            category_hits = []
+            for msg in message_history:
+                msg_lower = msg.lower()
+                category_hit = any(keyword in msg_lower for keyword in keywords)
+                category_hits.append(category_hit)
+            
+            # Calculate the percentage of messages containing this category
+            persistence_rate = sum(category_hits) / len(category_hits) if category_hits else 0
+            category_persistence[category] = persistence_rate
+        
+        # Identify persistent categories (mentioned in at least 30% of messages)
+        persistent_categories = [
+            category for category, rate in category_persistence.items() if rate >= 0.3
+        ]
+        
+        return {
+            "pattern_found": increasing_pattern or len(persistent_categories) > 0,
+            "increasing_pattern": increasing_pattern,
+            "persistent_categories": persistent_categories,
+            "category_persistence": category_persistence,
+        } 

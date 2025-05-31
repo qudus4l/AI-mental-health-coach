@@ -1,14 +1,19 @@
 """Main application module for the mental health coach."""
 
 import logging
+import os
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
 
 from src.mental_health_coach.api.api import api_router
 from src.mental_health_coach.database import init_db
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -16,6 +21,13 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Check for OpenAI API key
+if not os.environ.get("OPENAI_API_KEY"):
+    logger.warning(
+        "OPENAI_API_KEY environment variable not found. "
+        "LLM functionality will not work without a valid API key."
+    )
 
 # Create FastAPI application
 app = FastAPI(
