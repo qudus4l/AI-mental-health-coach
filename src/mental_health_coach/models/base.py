@@ -1,6 +1,9 @@
-"""Base module for SQLAlchemy models."""
+"""Base model module for the mental health coach application.
 
-from sqlalchemy.ext.declarative import declarative_base
+This module provides the base model class for SQLAlchemy models.
+"""
 
-# Create Base class for declarative models
+from sqlalchemy.orm import declarative_base
+
+# Create declarative base
 Base = declarative_base() 

@@ -113,6 +113,78 @@ class ConversationMemoryService:
         
         return chunks, metadata, vectors
     
+    def store_important_memory(
+        self, 
+        content: str, 
+        category: Optional[str] = None, 
+        importance_score: float = 0.5,
+        conversation_id: Optional[int] = None
+    ) -> ImportantMemory:
+        """Store an important memory from a conversation.
+        
+        Args:
+            content: The content of the memory.
+            category: Optional category for the memory (e.g., triggers, coping_strategies).
+            importance_score: A score from 0.0 to 1.0 indicating the memory's importance.
+            conversation_id: Optional ID of the conversation this memory is from.
+            
+        Returns:
+            The created ImportantMemory object.
+        """
+        # Create the memory object
+        memory = ImportantMemory(
+            user_id=self.user.id,
+            conversation_id=conversation_id,
+            content=content,
+            category=category,
+            importance_score=importance_score,
+            created_at=datetime.datetime.utcnow()
+        )
+        
+        # Add to database
+        self.db.add(memory)
+        self.db.commit()
+        self.db.refresh(memory)
+        
+        return memory
+    
+    def get_important_memories(
+        self, 
+        category: Optional[str] = None,
+        limit: int = 50,
+        min_importance: float = 0.0
+    ) -> List[ImportantMemory]:
+        """Retrieve important memories for the user.
+        
+        Args:
+            category: Optional filter by memory category.
+            limit: Maximum number of memories to retrieve.
+            min_importance: Minimum importance score threshold.
+            
+        Returns:
+            List of ImportantMemory objects.
+        """
+        # Build query
+        query = (
+            self.db.query(ImportantMemory)
+            .filter(ImportantMemory.user_id == self.user.id)
+            .filter(ImportantMemory.importance_score >= min_importance)
+        )
+        
+        # Add category filter if provided
+        if category:
+            query = query.filter(ImportantMemory.category == category)
+        
+        # Get results
+        memories = (
+            query
+            .order_by(ImportantMemory.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        
+        return memories
+    
     def retrieve_relevant_context(
         self, query: str, max_results: int = 5
     ) -> List[Dict[str, Any]]:

@@ -1,105 +1,105 @@
-"""Conversation models for the mental health coach application."""
+"""Conversation models for the mental health coach application.
 
+This module defines the database models for conversations, messages,
+and important memories extracted from conversations.
+"""
+
+from typing import Optional, List
 from datetime import datetime
-from typing import List, Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
-from src.mental_health_coach.models.base import Base
+from src.mental_health_coach.database import Base
 
 
 class Conversation(Base):
-    """Conversation model representing a complete interaction session.
-    
-    A conversation is a container for multiple messages exchanged between
-    the user and the AI coach during a single interaction.
+    """Model for storing conversation sessions between users and the AI coach.
     
     Attributes:
-        id: Primary key for the conversation.
-        user_id: Foreign key reference to the associated user.
-        title: Auto-generated title summarizing the conversation.
-        is_formal_session: Flag indicating if this is a formal therapy session.
-        session_number: For formal sessions, tracks the sequential number.
-        started_at: Timestamp when the conversation started.
-        ended_at: Timestamp when the conversation ended.
-        user: Reference to the associated User object.
-        messages: List of messages in this conversation.
+        id: Unique identifier for the conversation.
+        user_id: ID of the user participating in the conversation.
+        title: Optional title for the conversation.
+        is_formal_session: Whether this is a formal therapy session.
+        session_number: For formal sessions, the sequential session number.
+        started_at: When the conversation started.
+        ended_at: When the conversation ended (may be null if ongoing).
+        summary: Optional AI-generated summary of the conversation.
     """
     
     __tablename__ = "conversations"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=True)
-    is_formal_session = Column(Boolean, default=False)
+    is_formal_session = Column(Boolean, default=False, nullable=False)
     session_number = Column(Integer, nullable=True)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     ended_at = Column(DateTime, nullable=True)
+    summary = Column(Text, nullable=True)
     
     # Relationships
     user = relationship("User", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
-    homework_assignments = relationship("HomeworkAssignment", back_populates="conversation")
-
+    important_memories = relationship("ImportantMemory", back_populates="conversation", cascade="all, delete-orphan")
+    assessments = relationship("Assessment", back_populates="conversation", cascade="all, delete-orphan")
+    mood_rating = relationship("SessionMoodRating", back_populates="conversation", uselist=False, cascade="all, delete-orphan")
+    homework_assignments = relationship("HomeworkAssignment", back_populates="conversation", cascade="all, delete-orphan")
+    
 
 class Message(Base):
-    """Message model representing a single message in a conversation.
-    
-    Messages can be from either the user or the AI coach and are always
-    part of a conversation.
+    """Model for storing individual messages within a conversation.
     
     Attributes:
-        id: Primary key for the message.
-        conversation_id: Foreign key reference to the associated conversation.
-        is_from_user: Flag indicating if the message is from the user (vs AI).
-        content: The text content of the message.
-        created_at: Timestamp when the message was created.
-        updated_at: Timestamp when the message was last updated.
-        conversation: Reference to the associated Conversation object.
+        id: Unique identifier for the message.
+        conversation_id: ID of the conversation this message belongs to.
+        user_id: ID of the user (may be null for AI messages).
+        content: Text content of the message.
+        is_from_user: Whether the message is from the user (vs. AI).
+        created_at: When the message was created.
+        is_transcript: Whether this message is a transcript of speech.
     """
     
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey("conversations.id"))
-    is_from_user = Column(Boolean)
-    content = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    content = Column(Text, nullable=False)
+    is_from_user = Column(Boolean, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_transcript = Column(Boolean, default=False, nullable=False)
     
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
+    user = relationship("User", back_populates="messages")
 
 
 class ImportantMemory(Base):
-    """Important memory model for storing key therapeutic insights.
+    """Model for storing important memories extracted from conversations.
     
-    Important memories are AI-curated, significant pieces of information
-    about the user that should be remembered across sessions.
+    This model stores therapeutically significant insights, patterns,
+    or breakthroughs identified in conversations for later reference.
     
     Attributes:
-        id: Primary key for the important memory.
-        user_id: Foreign key reference to the associated user.
-        content: The text content of the memory.
-        category: The category of memory (triggers, coping_strategies, etc.).
+        id: Unique identifier for the memory.
+        user_id: ID of the user this memory relates to.
+        conversation_id: ID of the conversation this memory was extracted from.
+        content: Text content of the memory.
+        category: Category of the memory (triggers, coping_strategies, etc.).
         importance_score: AI-assigned importance score (0.0-1.0).
-        source_message_id: Optional reference to the message that led to this memory.
-        created_at: Timestamp when the memory was created.
-        updated_at: Timestamp when the memory was last updated.
-        user: Reference to the associated User object.
+        created_at: When the memory was created.
     """
     
     __tablename__ = "important_memories"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    content = Column(Text)
-    category = Column(String)  # triggers, coping_strategies, breakthrough, goal, etc.
-    importance_score = Column(Integer)  # 0-100
-    source_message_id = Column(Integer, ForeignKey("messages.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True)
+    content = Column(Text, nullable=False)
+    category = Column(String, nullable=True)
+    importance_score = Column(Float, nullable=False, default=0.5)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="important_memories")
-    source_message = relationship("Message") 
+    conversation = relationship("Conversation", back_populates="important_memories") 

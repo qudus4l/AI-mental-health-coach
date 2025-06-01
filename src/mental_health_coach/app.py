@@ -3,6 +3,7 @@
 import logging
 import os
 from typing import Any
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,11 +30,33 @@ if not os.environ.get("OPENAI_API_KEY"):
         "LLM functionality will not work without a valid API key."
     )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events handler for startup and shutdown.
+    
+    Args:
+        app: The FastAPI application.
+    """
+    # Startup
+    logger.info("Starting up the application")
+    
+    # Initialize database
+    init_db()
+    logger.info("Database initialized")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down the application")
+
+
 # Create FastAPI application
 app = FastAPI(
     title="Mental Health Coach API",
     description="API for the AI-powered mental health coaching platform",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -65,29 +88,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> Any:
         status_code=500,
         content={"message": "An unexpected error occurred. Please try again later."},
     )
-
-
-@app.on_event("startup")
-def startup_event() -> None:
-    """Application startup event.
-    
-    This function is called when the application starts up.
-    It initializes the database and performs other startup tasks.
-    """
-    logger.info("Starting up the application")
-    
-    # Initialize database
-    init_db()
-    logger.info("Database initialized")
-
-
-@app.on_event("shutdown")
-def shutdown_event() -> None:
-    """Application shutdown event.
-    
-    This function is called when the application shuts down.
-    """
-    logger.info("Shutting down the application")
 
 
 @app.get("/")

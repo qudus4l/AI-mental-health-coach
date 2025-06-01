@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
+import os
+import json
 
-from src.mental_health_coach.services.llm_service import LLMService
+from src.mental_health_coach.services.llm_service import LLMService, DEFAULT_SYSTEM_PROMPT
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
@@ -147,4 +149,182 @@ def test_generate_response_with_error(mock_openai_client: MagicMock) -> None:
     )
     
     # Check that an error message is returned
-    assert "I'm sorry, I'm having trouble" in response 
+    assert "I'm sorry, I'm having trouble" in response
+
+
+class TestLLMService:
+    """Tests for the LLMService class."""
+    
+    def test_init_with_api_key(self):
+        """Test initializing LLMService with an API key."""
+        # Setup
+        api_key = "test_api_key"
+        
+        # Mock OpenAI client
+        with patch('src.mental_health_coach.services.llm_service.OpenAI') as mock_openai:
+            # Create service
+            service = LLMService(api_key=api_key)
+            
+            # Verify OpenAI client was created with API key
+            mock_openai.assert_called_once_with(api_key=api_key)
+            
+            # Verify model name
+            assert service.model == "gpt-4.1-mini-2025-04-14"
+    
+    def test_init_with_env_var(self):
+        """Test initializing LLMService with API key from environment."""
+        # Setup - mock environment variable
+        test_api_key = "env_api_key"
+        with patch.dict(os.environ, {"OPENAI_API_KEY": test_api_key}):
+            # Mock OpenAI client
+            with patch('src.mental_health_coach.services.llm_service.OpenAI') as mock_openai:
+                # Create service without explicit API key
+                service = LLMService()
+                
+                # Verify OpenAI client was created with API key from env
+                mock_openai.assert_called_once_with(api_key=test_api_key)
+    
+    def test_init_without_api_key(self):
+        """Test initializing LLMService without API key raises error."""
+        # Setup - ensure environment variable is not set
+        with patch.dict(os.environ, {}, clear=True):
+            # Verify error is raised
+            with pytest.raises(ValueError) as excinfo:
+                LLMService()
+            
+            # Check error message
+            assert "OpenAI API key not provided" in str(excinfo.value)
+    
+    @patch('src.mental_health_coach.services.llm_service.OpenAI')
+    def test_generate_response_formal_session(self, mock_openai_class):
+        """Test generating a response for a formal session."""
+        # Setup
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock completion response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "Test response"
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Create service and generate response
+        service = LLMService(api_key="test_key")
+        response = service.generate_response(
+            user_message="Hello",
+            conversation_history=[],
+            is_formal_session=True
+        )
+        
+        # Verify response
+        assert response == "Test response"
+        
+        # Verify API call
+        mock_client.chat.completions.create.assert_called_once()
+        
+        # Get the args from the call
+        call_args = mock_client.chat.completions.create.call_args[1]
+        messages = call_args["messages"]
+        
+        # Verify system prompt
+        assert messages[0]["role"] == "system"
+        assert DEFAULT_SYSTEM_PROMPT in messages[0]["content"]
+        assert "SESSION_MODE = formal" in messages[0]["content"]
+    
+    @patch('src.mental_health_coach.services.llm_service.OpenAI')
+    def test_generate_response_casual_session(self, mock_openai_class):
+        """Test generating a response for a casual session."""
+        # Setup
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock completion response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "Test response"
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Create service and generate response
+        service = LLMService(api_key="test_key")
+        response = service.generate_response(
+            user_message="Hello",
+            conversation_history=[],
+            is_formal_session=False
+        )
+        
+        # Verify response
+        assert response == "Test response"
+        
+        # Get the args from the call
+        call_args = mock_client.chat.completions.create.call_args[1]
+        messages = call_args["messages"]
+        
+        # Verify system prompt
+        assert "SESSION_MODE = casual" in messages[0]["content"]
+    
+    @patch('src.mental_health_coach.services.llm_service.OpenAI')
+    def test_generate_response_with_crisis(self, mock_openai_class):
+        """Test generating a response with crisis detection."""
+        # Setup
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock completion response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "Crisis response"
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Create service and generate response
+        service = LLMService(api_key="test_key")
+        response = service.generate_response(
+            user_message="I feel hopeless",
+            conversation_history=[],
+            crisis_detected=True
+        )
+        
+        # Verify response
+        assert response == "Crisis response"
+        
+        # Get the args from the call
+        call_args = mock_client.chat.completions.create.call_args[1]
+        messages = call_args["messages"]
+        
+        # Verify system prompt
+        assert "CRISIS_FLAG = true" in messages[0]["content"]
+    
+    @patch('src.mental_health_coach.services.llm_service.OpenAI')
+    def test_extract_important_memory(self, mock_openai_class):
+        """Test extracting important memory from conversation."""
+        # Setup
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Create mock memory response
+        memory_data = {
+            "content": "User mentioned having anxiety in social situations",
+            "category": "triggers",
+            "importance_score": 0.8
+        }
+        
+        # Mock completion response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = json.dumps(memory_data)
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Create service and extract memory
+        service = LLMService(api_key="test_key")
+        memory = service.extract_important_memory(
+            conversation_history=[
+                {"is_from_user": True, "content": "I get anxious at parties"},
+                {"is_from_user": False, "content": "That sounds difficult. When did you first notice this?"}
+            ]
+        )
+        
+        # Verify memory extraction
+        assert memory["content"] == "User mentioned having anxiety in social situations"
+        assert memory["category"] == "triggers"
+        assert memory["importance_score"] == 0.8
+        
+        # Verify API call
+        call_args = mock_client.chat.completions.create.call_args[1]
+        
+        # Check that response format is set to JSON
+        assert call_args["response_format"] == {"type": "json_object"} 

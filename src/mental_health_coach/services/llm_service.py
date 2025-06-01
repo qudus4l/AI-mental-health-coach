@@ -159,15 +159,21 @@ class LLMService:
         
         # Add user profile if available
         if user_profile:
-            profile_text = "User Profile Information:\n"
+            profile_text = "USER PROFILE INFORMATION:\n"
+            if "anxiety_score" in user_profile:
+                profile_text += f"- Anxiety level: {user_profile['anxiety_score']}/10\n"
+            if "depression_score" in user_profile:
+                profile_text += f"- Depression level: {user_profile['depression_score']}/10\n"
+            
             for key, value in user_profile.items():
-                profile_text += f"- {key}: {value}\n"
+                if key not in ["anxiety_score", "depression_score"]:
+                    profile_text += f"- {key}: {value}\n"
             
             messages.append({"role": "system", "content": profile_text})
         
         # Add relevant memories if available
         if relevant_memories and len(relevant_memories) > 0:
-            memory_text = "Relevant Information from Past Conversations:\n"
+            memory_text = "RELEVANT CONTEXT FROM PREVIOUS CONVERSATIONS:\n"
             for memory in relevant_memories:
                 if "text" in memory:
                     memory_text += f"- {memory['text']}\n"
@@ -243,14 +249,20 @@ class LLMService:
         
         # Add user profile if available
         if user_profile:
-            profile_text = "User Profile Information:\n"
+            profile_text = "USER PROFILE INFORMATION:\n"
+            if "anxiety_score" in user_profile:
+                profile_text += f"- Anxiety level: {user_profile['anxiety_score']}/10\n"
+            if "depression_score" in user_profile:
+                profile_text += f"- Depression level: {user_profile['depression_score']}/10\n"
+            
             for key, value in user_profile.items():
-                profile_text += f"- {key}: {value}\n"
+                if key not in ["anxiety_score", "depression_score"]:
+                    profile_text += f"- {key}: {value}\n"
             
             messages.append({"role": "system", "content": profile_text})
         
         # Add conversation history
-        conversation_text = "Conversation History:\n"
+        conversation_text = "CONVERSATION HISTORY:\n"
         for message in conversation_history:
             sender = "User" if message.get("is_from_user", False) else "Coach"
             content = message.get("content", "")

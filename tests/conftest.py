@@ -1,68 +1,68 @@
-"""Pytest configuration for the mental health coach application tests."""
+"""Test configuration for pytest.
 
-from typing import Any, Generator
+This module provides fixtures for testing the mental health coach application.
+"""
+
 import os
-
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
+# Import the Base from models.base to ensure consistency
 from src.mental_health_coach.models.base import Base
-from src.mental_health_coach.database import get_db
-from src.mental_health_coach.app import app
+# Import models to ensure they're registered with Base
+from src.mental_health_coach.models.user import User, UserProfile, SessionSchedule
+from src.mental_health_coach.models.conversation import Conversation, Message, ImportantMemory
+from src.mental_health_coach.models.homework import HomeworkAssignment
+from src.mental_health_coach.models.assessment import Assessment, SessionMoodRating
+from src.mental_health_coach.models.emergency_contact import EmergencyContact
 
 
-# Create an in-memory SQLite test database
-SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(
-    SQLALCHEMY_TEST_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-@pytest.fixture(scope="function")
-def db() -> Generator[Session, None, None]:
-    """Create a clean database session for a test.
+@pytest.fixture(scope="session")
+def test_db_engine():
+    """Create a test database engine.
     
-    Yields:
-        Session: A SQLAlchemy database session.
+    Returns:
+        SQLAlchemy engine for the test database.
     """
-    # Create the database tables
+    # Use file-based SQLite for tests
+    test_db_path = "test_mental_health_coach.db"
+    
+    # Remove existing test DB if it exists
+    if os.path.exists(test_db_path):
+        os.remove(test_db_path)
+    
+    engine = create_engine(
+        f"sqlite:///{test_db_path}",
+        connect_args={"check_same_thread": False},
+    )
+    
+    # Create all tables
     Base.metadata.create_all(bind=engine)
     
-    # Create a new database session
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        # Drop the database tables
-        Base.metadata.drop_all(bind=engine)
+    yield engine
+    
+    # Clean up after tests
+    if os.path.exists(test_db_path):
+        os.remove(test_db_path)
 
 
-@pytest.fixture(scope="function")
-def client(db: Session) -> Generator[TestClient, None, None]:
-    """Create a test client with the test database.
+@pytest.fixture
+def db_session(test_db_engine):
+    """Create a test database session.
     
     Args:
-        db: Database session.
+        test_db_engine: Test database engine.
         
-    Yields:
-        TestClient: A FastAPI test client.
+    Returns:
+        Database session for testing.
     """
-    # Override the get_db dependency to use the test database
-    def override_get_db() -> Generator[Session, None, None]:
-        try:
-            yield db
-        finally:
-            pass
+    # Create session
+    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
+    session = TestSessionLocal()
     
-    app.dependency_overrides[get_db] = override_get_db
-    
-    # Create the test client
-    with TestClient(app) as test_client:
-        yield test_client
-    
-    # Remove the dependency override
-    app.dependency_overrides.clear() 
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close() 

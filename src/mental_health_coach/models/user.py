@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 
 from src.mental_health_coach.models.base import Base
@@ -31,18 +31,25 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
     first_name = Column(String)
     last_name = Column(String)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    profile_data = Column(Text, nullable=True)  # JSON string for flexible profile data
     
     # Relationships
-    conversations = relationship("Conversation", back_populates="user")
-    important_memories = relationship("ImportantMemory", back_populates="user")
-    homework_assignments = relationship("HomeworkAssignment", back_populates="user")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
+    important_memories = relationship("ImportantMemory", back_populates="user", cascade="all, delete-orphan")
+    homework_assignments = relationship("HomeworkAssignment", back_populates="user", cascade="all, delete-orphan")
+    session_schedules = relationship("SessionSchedule", back_populates="user", cascade="all, delete-orphan")
+    emergency_contacts = relationship("EmergencyContact", back_populates="user", cascade="all, delete-orphan")
+    assessments = relationship("Assessment", back_populates="user", cascade="all, delete-orphan")
+    mood_ratings = relationship("SessionMoodRating", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -111,4 +118,4 @@ class SessionSchedule(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    user = relationship("User", backref="session_schedules") 
+    user = relationship("User", back_populates="session_schedules") 
