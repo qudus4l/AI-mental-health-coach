@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { login } from '../../lib/api/auth';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../app/components/ui/Card';
+import { Input } from '../../../app/components/ui/Input';
+import { Button } from '../../../app/components/ui/Button';
+import { login } from '../../../lib/api/auth';
+import { AxiosError } from 'axios';
 
 // Form validation schema
 const loginSchema = z.object({
@@ -23,8 +24,23 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Check for query parameters
+  useEffect(() => {
+    const registered = searchParams.get('registered');
+    if (registered === 'true') {
+      setSuccessMessage('Account created successfully! Please log in.');
+    }
+    
+    const sessionExpired = searchParams.get('session_expired');
+    if (sessionExpired === 'true') {
+      setError('Your session has expired. Please log in again.');
+    }
+  }, [searchParams]);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -37,12 +53,19 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       await login({ email: data.email, password: data.password });
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to login. Please check your credentials.');
+    } catch (err) {
+      console.error('Login error:', err);
+      
+      if (err instanceof AxiosError) {
+        setError(err.response?.data?.detail || 'Invalid email or password');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -68,6 +91,12 @@ export default function LoginPage() {
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
                 {error}
+              </div>
+            )}
+            
+            {successMessage && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-600 rounded-lg text-sm">
+                {successMessage}
               </div>
             )}
             

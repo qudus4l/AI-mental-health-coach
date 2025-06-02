@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from src.mental_health_coach.api.api import api_router
-from src.mental_health_coach.database import init_db
+from src.mental_health_coach.database import init_db, check_and_update_schema
 
 # Load environment variables from .env file
 load_dotenv()
@@ -44,6 +44,11 @@ async def lifespan(app: FastAPI):
     # Initialize database
     init_db()
     logger.info("Database initialized")
+    
+    # Double-check schema after initialization
+    # This ensures we catch any schema issues even if they were missed during init_db
+    check_and_update_schema()
+    logger.info("Database schema verified")
     
     yield
     

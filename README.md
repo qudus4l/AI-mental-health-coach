@@ -100,3 +100,29 @@ To use your own model:
 ## License
 
 [MIT License](LICENSE) 
+
+## Database Management
+
+The application uses SQLite for development and can be configured to use PostgreSQL in production.
+
+### Database Schema Changes
+
+When making changes to the database schema:
+
+1. Always use migrations to apply schema changes
+2. Test migrations on development before applying to production
+3. See [Database Guide](docs/database.md) for detailed instructions
+
+To create a new migration:
+
+```bash
+python -m src.mental_health_coach.utils.migrations create migration_name "Description of migration"
+```
+
+To apply pending migrations:
+
+```bash
+python -m src.mental_health_coach.utils.migrations apply mental_health_coach.db
+```
+
+The application automatically runs migrations during startup. 

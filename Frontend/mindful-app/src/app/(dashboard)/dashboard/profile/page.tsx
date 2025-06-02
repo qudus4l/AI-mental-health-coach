@@ -2,300 +2,274 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiUser, FiMail, FiLock, FiEdit, FiSave, FiCheck, FiX } from 'react-icons/fi';
+import { z } from 'zod';
+import { motion } from 'framer-motion';
+import { AxiosError } from 'axios';
 
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../../../components/ui/Card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../components/ui/Card';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
-import { ChangePasswordForm } from '../../../components/auth/ChangePasswordForm';
+import { getUserProfile, createUserProfile, updateUserProfile, UserProfile, UserProfileUpdate } from '../../../../lib/api/users';
 
 // Form validation schema
 const profileSchema = z.object({
-  first_name: z.string().min(1, 'First name is required'),
-  last_name: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Please enter a valid email'),
-  bio: z.string().optional(),
+  age: z.preprocess(
+    (val) => val === '' ? null : Number(val),
+    z.number().min(18, 'You must be at least 18 years old').max(120, 'Please enter a valid age').nullable()
+  ),
+  location: z.string().nullable().optional(),
+  anxiety_score: z.preprocess(
+    (val) => val === '' ? null : Number(val),
+    z.number().min(0, 'Score must be at least 0').max(10, 'Score cannot exceed 10').nullable()
+  ),
+  depression_score: z.preprocess(
+    (val) => val === '' ? null : Number(val),
+    z.number().min(0, 'Score must be at least 0').max(10, 'Score cannot exceed 10').nullable()
+  ),
+  communication_preference: z.enum(['text', 'voice', 'both']),
+  session_frequency: z.preprocess(
+    (val) => Number(val),
+    z.number().min(1, 'At least 1 session per week').max(7, 'Maximum 7 sessions per week')
+  ),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-// Demo user data
-const demoUser = {
-  first_name: 'Jamie',
-  last_name: 'Johnson',
-  email: 'jamie.johnson@example.com',
-  bio: 'Working on managing stress and anxiety through mindfulness practices.',
-};
-
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: demoUser,
+    defaultValues: {
+      age: null,
+      location: '',
+      anxiety_score: null,
+      depression_score: null,
+      communication_preference: 'text',
+      session_frequency: 2,
+    },
   });
   
-  // Simulate loading data
+  // Load user profile data
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const fetchProfile = async () => {
+      try {
+        setIsLoading(true);
+        const profileData = await getUserProfile();
+        
+        if (profileData) {
+          setProfile(profileData);
+          reset({
+            age: profileData.age,
+            location: profileData.location || '',
+            anxiety_score: profileData.anxiety_score,
+            depression_score: profileData.depression_score,
+            communication_preference: profileData.communication_preference as 'text' | 'voice' | 'both',
+            session_frequency: profileData.session_frequency,
+          });
+        } else {
+          setIsCreating(true);
+        }
+        
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+        setError('Failed to load profile. Please try again.');
+      } finally {
       setIsLoading(false);
-    }, 800);
+      }
+    };
     
-    return () => clearTimeout(timer);
-  }, []);
+    fetchProfile();
+  }, [reset]);
   
   const onSubmit = async (data: ProfileFormValues) => {
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsEditing(false);
-      setUpdateSuccess(true);
+    setIsSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      if (isCreating) {
+        // Create new profile
+        const newProfile = await createUserProfile(data);
+        setProfile(newProfile);
+        setIsCreating(false);
+        setSuccessMessage('Profile created successfully!');
+      } else {
+        // Update existing profile
+        const updatedProfile = await updateUserProfile(data);
+        setProfile(updatedProfile);
+        setSuccessMessage('Profile updated successfully!');
+      }
+    } catch (err) {
+      console.error('Error saving profile:', err);
       
-      // Reset success message after 3 seconds
-      setTimeout(() => {
-        setUpdateSuccess(false);
-      }, 3000);
-    }, 1000);
-  };
-  
-  const handleCancel = () => {
-    reset(demoUser);
-    setIsEditing(false);
+      if (err instanceof AxiosError) {
+        setError(err.response?.data?.detail || 'Failed to save profile. Please try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   return (
-    <>
+    <div className="container max-w-3xl mx-auto py-8">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="floating-delayed"
       >
-        <div className="mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-sage-800">Your Profile</h1>
-          <p className="text-sage-600 mt-2">Manage your personal information</p>
-        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-sage-800 mb-2">Your Profile</h1>
+        <p className="text-sage-600 mb-8">Manage your personal information and preferences</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Profile Information */}
-          <div className="md:col-span-2">
-            <Card className="floating">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <FiUser className="mr-2 text-sage-500" />
-                  Personal Information
-                </CardTitle>
-                
-                {!isEditing && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setIsEditing(true)}
-                    className="text-sage-600"
-                  >
-                    <FiEdit className="mr-1" />
-                    Edit
-                  </Button>
-                )}
+        <Card>
+          <CardHeader>
+            <CardTitle>{isCreating ? 'Complete Your Profile' : 'Edit Profile'}</CardTitle>
+            <CardDescription>
+              {isCreating 
+                ? 'Please provide some information to help us personalize your experience' 
+                : 'Update your profile information and preferences'}
+            </CardDescription>
               </CardHeader>
               
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-12 bg-cream-100 animate-pulse rounded-lg"></div>
-                    ))}
+              <div className="flex justify-center py-8">
+                <div className="animate-spin w-8 h-8 border-4 border-sage-200 border-t-sage-500 rounded-full"></div>
+              </div>
+            ) : (
+              <>
+                {error && (
+                  <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+                    {error}
                   </div>
-                ) : (
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                )}
+                
+                {successMessage && (
+                  <div className="mb-6 p-3 bg-green-50 border border-green-200 text-green-600 rounded-lg text-sm">
+                    {successMessage}
+                  </div>
+                )}
+                
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Input
-                        label="First Name"
-                        error={errors.first_name?.message}
-                        disabled={!isEditing || isLoading}
-                        {...register('first_name')}
+                      label="Age"
+                      type="number"
+                      placeholder="Enter your age"
+                      error={errors.age?.message}
+                      disabled={isSaving}
+                      {...register('age')}
                       />
-                      
-                      <Input
-                        label="Last Name"
-                        error={errors.last_name?.message}
-                        disabled={!isEditing || isLoading}
-                        {...register('last_name')}
-                      />
-                    </div>
                     
                     <Input
-                      label="Email Address"
-                      type="email"
-                      error={errors.email?.message}
-                      disabled={true} // Email cannot be edited
-                      {...register('email')}
+                      label="Location"
+                      placeholder="City, Country"
+                      error={errors.location?.message}
+                      disabled={isSaving}
+                      {...register('location')}
                     />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-sage-700 mb-1">
+                        Anxiety Level (0-10)
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="10"
+                        step="1"
+                        className="w-full h-2 bg-cream-100 rounded-lg appearance-none cursor-pointer"
+                        disabled={isSaving}
+                        {...register('anxiety_score')}
+                      />
+                      {errors.anxiety_score && (
+                        <p className="text-sm text-red-500 mt-1">{errors.anxiety_score.message}</p>
+                      )}
+                    </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-sage-700 mb-1">
-                        Bio
+                        Depression Level (0-10)
                       </label>
-                      <textarea
-                        className="w-full px-4 py-2 rounded-lg border bg-cream-50/50 border-cream-300 focus:outline-none focus:ring-2 focus:ring-sage-200 focus:border-transparent resize-none transition-all"
-                        rows={4}
-                        disabled={!isEditing || isLoading}
-                        placeholder="Tell us a bit about yourself"
-                        {...register('bio')}
+                      <input
+                        type="range"
+                        min="0"
+                        max="10"
+                        step="1"
+                        className="w-full h-2 bg-cream-100 rounded-lg appearance-none cursor-pointer"
+                        disabled={isSaving}
+                        {...register('depression_score')}
                       />
-                    </div>
-                    
-                    {isEditing && (
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={handleCancel}
-                          disabled={isLoading}
-                        >
-                          Cancel
-                        </Button>
-                        
-                        <Button
-                          type="submit"
-                          disabled={isLoading}
-                          className="flex items-center"
-                        >
-                          {isLoading ? 'Saving...' : (
-                            <>
-                              <FiSave className="mr-1" />
-                              Save Changes
-                            </>
+                      {errors.depression_score && (
+                        <p className="text-sm text-red-500 mt-1">{errors.depression_score.message}</p>
                           )}
-                        </Button>
+                    </div>
                       </div>
-                    )}
-                    
-                    {updateSuccess && (
-                      <div className="p-3 bg-sage-100 border border-sage-200 text-sage-700 rounded-lg flex items-center">
-                        <FiCheck className="mr-2 text-sage-500" />
-                        Profile updated successfully
-                      </div>
-                    )}
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Security Section */}
-            <Card className="mt-6 floating-delayed">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <FiLock className="mr-2 text-sage-500" />
-                  Security
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent>
-                <Button 
-                  className="w-full md:w-auto"
-                  onClick={() => setShowPasswordModal(true)}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-sage-700 mb-1">
+                      Communication Preference
+                    </label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg border border-cream-300 bg-cream-50/50 focus:outline-none focus:ring-2 focus:ring-sage-200 focus:border-transparent"
+                      disabled={isSaving}
+                      {...register('communication_preference')}
                 >
-                  Change Password
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Profile Summary */}
-          <div>
-            <Card className="floating">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium flex items-center">
-                  <FiUser className="mr-2 text-sage-500" />
-                  Profile Summary
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-4">
-                    <div className="w-24 h-24 bg-cream-100 animate-pulse rounded-full mx-auto"></div>
-                    <div className="h-8 bg-cream-100 animate-pulse rounded-lg"></div>
-                    <div className="h-4 bg-cream-100 animate-pulse rounded-lg"></div>
+                      <option value="text">Text Only</option>
+                      <option value="voice">Voice Only</option>
+                      <option value="both">Both Text and Voice</option>
+                    </select>
+                    {errors.communication_preference && (
+                      <p className="text-sm text-red-500 mt-1">{errors.communication_preference.message}</p>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center">
-                    <div className="w-24 h-24 bg-sage-100 rounded-full mx-auto flex items-center justify-center">
-                      <span className="text-sage-600 text-2xl font-semibold">
-                        {demoUser.first_name[0]}{demoUser.last_name[0]}
-                      </span>
-                    </div>
-                    
-                    <h3 className="mt-4 text-lg font-semibold text-sage-800">
-                      {demoUser.first_name} {demoUser.last_name}
-                    </h3>
-                    
-                    <p className="text-sage-600 flex items-center justify-center mt-1">
-                      <FiMail className="mr-1" size={14} />
-                      {demoUser.email}
-                    </p>
-                    
-                    <div className="mt-6 p-4 bg-cream-50 rounded-lg border border-cream-200">
-                      <h4 className="font-medium text-sage-700 mb-2">Stats</h4>
-                      <div className="grid grid-cols-2 gap-2 text-center">
+                  
                         <div>
-                          <p className="text-lg font-bold text-sage-800">12</p>
-                          <p className="text-xs text-sage-600">Sessions</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold text-sage-800">8</p>
-                          <p className="text-xs text-sage-600">Homework</p>
-                        </div>
-                      </div>
-                    </div>
+                    <label className="block text-sm font-medium text-sage-700 mb-1">
+                      Sessions Per Week
+                    </label>
+                    <select
+                      className="w-full px-4 py-2 rounded-lg border border-cream-300 bg-cream-50/50 focus:outline-none focus:ring-2 focus:ring-sage-200 focus:border-transparent"
+                      disabled={isSaving}
+                      {...register('session_frequency')}
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map(num => (
+                        <option key={num} value={num}>{num} {num === 1 ? 'session' : 'sessions'}</option>
+                      ))}
+                    </select>
+                    {errors.session_frequency && (
+                      <p className="text-sm text-red-500 mt-1">{errors.session_frequency.message}</p>
+                    )}
                   </div>
+                  
+                  <Button
+                    type="submit"
+                    fullWidth
+                    disabled={isSaving}
+                    className="mt-4"
+                  >
+                    {isSaving 
+                      ? (isCreating ? 'Creating profile...' : 'Updating profile...') 
+                      : (isCreating ? 'Create profile' : 'Update profile')
+                    }
+                  </Button>
+                </form>
+              </>
                 )}
               </CardContent>
             </Card>
-          </div>
-        </div>
       </motion.div>
-      
-      {/* Password Change Modal */}
-      <AnimatePresence>
-        {showPasswordModal && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-              onClick={() => setShowPasswordModal(false)}
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="fixed inset-0 flex items-center justify-center z-50 p-4"
-            >
-              <div className="relative w-full max-w-md">
-                <button
-                  onClick={() => setShowPasswordModal(false)}
-                  className="absolute -top-10 right-0 text-white bg-sage-500 hover:bg-sage-600 p-2 rounded-full"
-                >
-                  <FiX />
-                </button>
-                <ChangePasswordForm onClose={() => setShowPasswordModal(false)} />
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
   );
 } 

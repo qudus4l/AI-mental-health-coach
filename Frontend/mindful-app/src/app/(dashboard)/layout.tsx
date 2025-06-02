@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Cookies from 'js-cookie';
 import { FiHome, FiMessageCircle, FiClipboard, FiUser, FiLogOut, FiMenu, FiX, FiActivity, FiHeart, FiCalendar } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { Button } from '../../components/ui/Button';
-import { SkipLink, ContentAnchor } from '../../components/ui/SkipLink';
+import { SkipLink, ContentAnchor } from '../components/ui/SkipLink';
 import { logout } from '../../lib/api/auth';
 
 export default function DashboardLayout({
@@ -15,9 +15,21 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
+  
+  // Initialize mobile view state after component mounts
+  useEffect(() => {
+    setIsMobileView(window.innerWidth < 768);
+    
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Close mobile menu when route changes
   useEffect(() => {
@@ -39,8 +51,17 @@ export default function DashboardLayout({
   }, [isMobileMenuOpen]);
   
   const handleLogout = () => {
+    // First clear all auth state directly
+    Cookies.remove('mindful-auth-token', { path: '/' });
+    localStorage.removeItem('mindful-auth-token');
+    localStorage.removeItem('mindful-auth');
+    sessionStorage.clear();
+    
+    // Then call the logout function (as a fallback)
     logout();
-    router.push('/login');
+    
+    // Redirect with a full page reload
+    window.location.href = '/login';
   };
   
   const navigation = [
@@ -106,7 +127,7 @@ export default function DashboardLayout({
                     overflow-y-auto border-r border-cream-200 p-4 flex flex-col`}
         id="mobile-menu"
         aria-label="Main navigation"
-        aria-hidden={!isMobileMenuOpen && window.innerWidth < 768}
+        aria-hidden={!isMobileMenuOpen && isMobileView}
       >
         {/* Logo */}
         <div className="flex items-center mb-8 mt-2">

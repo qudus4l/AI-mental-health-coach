@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 interface MoodEntry {
   date: string;
   mood: number;
-  note?: string;
+  note?: string | null;
 }
 
 interface MoodChartProps {

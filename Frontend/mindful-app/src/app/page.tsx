@@ -1,7 +1,42 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Cookies from 'js-cookie';
+import { Button } from './components/ui/Button';
+import { isAuthenticated, getCurrentUser } from '../lib/api/auth';
 import { FiArrowRight, FiHeart, FiMessageCircle, FiSun } from 'react-icons/fi';
 
 export default function Home() {
+  const [clientAuthState, setClientAuthState] = useState<{
+    isAuthenticated: boolean;
+    token: string | null;
+    cookieToken: string | null;
+    user: any;
+  }>({
+    isAuthenticated: false,
+    token: null,
+    cookieToken: null,
+    user: null
+  });
+
+  useEffect(() => {
+    // Check auth state on client side
+    setClientAuthState({
+      isAuthenticated: isAuthenticated(),
+      token: localStorage.getItem('mindful-auth-token'),
+      cookieToken: Cookies.get('mindful-auth-token') || null,
+      user: getCurrentUser()
+    });
+  }, []);
+
+  const clearAuth = () => {
+    Cookies.remove('mindful-auth-token', { path: '/' });
+    localStorage.removeItem('mindful-auth-token');
+    localStorage.removeItem('mindful-auth');
+    window.location.reload();
+  };
+
   return (
     <div style={{ minHeight: '100vh' }}>
       {/* Header */}
@@ -191,6 +226,20 @@ export default function Home() {
           <p style={{ color: 'var(--color-sage-600)' }}>&copy; {new Date().getFullYear()} Mindful AI Coach. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Debug authentication state */}
+      <div className="mt-10 p-4 bg-white rounded-lg shadow border border-gray-200 text-left">
+        <h2 className="text-lg font-bold mb-2">Auth Debug Info</h2>
+        <pre className="text-xs overflow-auto p-2 bg-gray-100 rounded">
+          {JSON.stringify(clientAuthState, null, 2)}
+        </pre>
+        <button 
+          onClick={clearAuth}
+          className="mt-2 px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+        >
+          Clear Auth
+        </button>
+      </div>
     </div>
   );
 }

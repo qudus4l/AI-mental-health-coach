@@ -7,46 +7,14 @@ import { FiArrowLeft, FiSend, FiCalendar, FiInfo, FiUser } from 'react-icons/fi'
 
 import { Button } from '../../../../components/ui/Button';
 import { Card } from '../../../../components/ui/Card';
-
-// Demo conversation data
-const demoConversation = {
-  id: 1,
-  title: 'Weekly Session #12',
-  date: '2024-07-08T16:30:00',
-  isSession: true,
-  messages: [
-    {
-      id: 1,
-      content: "Hello! How are you feeling today?",
-      isUser: false,
-      timestamp: "2024-07-08T16:30:00",
-    },
-    {
-      id: 2,
-      content: "I've been feeling a bit anxious lately, especially at work.",
-      isUser: true,
-      timestamp: "2024-07-08T16:31:12",
-    },
-    {
-      id: 3,
-      content: "I'm sorry to hear you've been feeling anxious. That can be challenging. Can you tell me more about what's been happening at work that's triggering this anxiety?",
-      isUser: false,
-      timestamp: "2024-07-08T16:31:45",
-    },
-    {
-      id: 4,
-      content: "I have a big presentation coming up next week, and I'm worried I'll mess it up. I've been having trouble sleeping thinking about it.",
-      isUser: true,
-      timestamp: "2024-07-08T16:33:02",
-    },
-    {
-      id: 5,
-      content: "That's understandable. Public speaking and important presentations can definitely trigger anxiety for many people. Let's work through this together. First, it might help to identify what specific aspects of the presentation are causing you the most worry. Is it the preparation, the delivery, or perhaps the response from your audience?",
-      isUser: false,
-      timestamp: "2024-07-08T16:34:10",
-    },
-  ]
-};
+import { 
+  getConversation, 
+  getMessages, 
+  sendMessage, 
+  endConversation,
+  Conversation,
+  Message
+} from '../../../../../lib/api/conversations';
 
 // Format time from ISO string
 const formatMessageTime = (dateStr: string) => {
@@ -58,63 +26,137 @@ export default function ConversationPage({ params }: { params: { id: string } })
   const router = useRouter();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [conversation, setConversation] = useState(demoConversation);
+  const [error, setError] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   
-  // Simulate loading data
+  // Load conversation and messages
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const conversationId = parseInt(params.id);
+    if (isNaN(conversationId)) {
+      setError('Invalid conversation ID');
       setIsLoading(false);
-    }, 800);
+      return;
+    }
     
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchConversation = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get conversation details
+        const conversationData = await getConversation(conversationId);
+        setConversation(conversationData);
+        
+        // Get messages
+        const messagesData = await getMessages(conversationId);
+        setMessages(messagesData);
+        
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching conversation:', err);
+        setError('Failed to load conversation. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchConversation();
+  }, [params.id]);
   
   // Scroll to bottom of messages when messages change
   useEffect(() => {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     }
-  }, [conversation.messages, isTyping]);
+  }, [messages, isTyping]);
   
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !conversation || isSending) return;
     
-    // Add user message
-    const userMessage = {
-      id: conversation.messages.length + 1,
-      content: newMessage,
-      isUser: true,
-      timestamp: new Date().toISOString(),
-    };
+    const conversationId = parseInt(params.id);
+    if (isNaN(conversationId)) {
+      setError('Invalid conversation ID');
+      return;
+    }
     
-    setConversation(prev => ({
-      ...prev,
-      messages: [...prev.messages, userMessage],
-    }));
-    
+    try {
+      setIsSending(true);
+      
+      // Send the message
+      const messageResponse = await sendMessage(conversationId, {
+        content: newMessage,
+        is_from_user: true
+      });
+      
+      // Update UI immediately with user message
+      setMessages(prev => [...prev, messageResponse.message]);
+      
+      // Clear input
     setNewMessage('');
     
-    // Simulate AI typing
+      // Show AI typing indicator
     setIsTyping(true);
     
-    // Simulate AI response after delay
+      // If AI response is included, add it after a delay to simulate typing
+      if (messageResponse.ai_message) {
     setTimeout(() => {
-      const aiMessage = {
-        id: conversation.messages.length + 2,
-        content: "Thank you for sharing that. I understand how stressful preparing for presentations can be. Let's work on some breathing exercises that might help reduce your anxiety. Would you like to try one now?",
-        isUser: false,
-        timestamp: new Date().toISOString(),
-      };
+          setMessages(prev => [...prev, messageResponse.ai_message!]);
+          setIsTyping(false);
+        }, 1000);
+      } else {
+        // If no AI response (unusual), clear typing indicator
+        setIsTyping(false);
+      }
       
-      setConversation(prev => ({
-        ...prev,
-        messages: [...prev.messages, aiMessage],
-      }));
-      
+      // If crisis was detected, show alert
+      if (messageResponse.crisis_detected) {
+        alert('Crisis detected. Emergency resources have been provided.');
+      }
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError('Failed to send message. Please try again.');
       setIsTyping(false);
-    }, 2000);
+    } finally {
+      setIsSending(false);
+    }
+  };
+  
+  const handleEndConversation = async () => {
+    if (!conversation) return;
+    
+    const conversationId = parseInt(params.id);
+    if (isNaN(conversationId)) {
+      setError('Invalid conversation ID');
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to end this conversation?')) {
+      try {
+        await endConversation(conversationId);
+        
+        // Update the local conversation state
+        setConversation(prev => prev ? { ...prev, ended_at: new Date().toISOString() } : null);
+        
+        // Add system message
+        const systemMessage: Message = {
+          id: Date.now(),
+          conversation_id: conversationId,
+          user_id: null,
+          content: 'Conversation ended',
+          is_from_user: false,
+          created_at: new Date().toISOString(),
+          is_transcript: false
+        };
+        
+        setMessages(prev => [...prev, systemMessage]);
+      } catch (err) {
+        console.error('Error ending conversation:', err);
+        setError('Failed to end conversation. Please try again.');
+      }
+    }
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -123,6 +165,8 @@ export default function ConversationPage({ params }: { params: { id: string } })
       handleSendMessage();
     }
   };
+  
+  const isConversationEnded = conversation?.ended_at !== null;
   
   return (
     <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] flex flex-col">
@@ -143,18 +187,37 @@ export default function ConversationPage({ params }: { params: { id: string } })
           </Button>
           
           <div>
-            <h1 className="text-xl font-bold text-sage-800">{conversation.title}</h1>
+            <h1 className="text-xl font-bold text-sage-800">
+              {conversation?.title || (
+                conversation?.is_formal_session 
+                  ? `Weekly Session #${conversation.session_number}` 
+                  : 'Casual Conversation'
+              )}
+            </h1>
+            {conversation && (
             <p className="text-sm text-sage-600 flex items-center">
               <FiCalendar className="mr-1" size={14} />
-              {new Date(conversation.date).toLocaleDateString()}
+                {new Date(conversation.started_at).toLocaleDateString()}
             </p>
+            )}
           </div>
         </div>
         
-        <Button variant="ghost" size="sm">
-          <FiInfo />
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={handleEndConversation}
+          disabled={isLoading || isConversationEnded}
+        >
+          {isConversationEnded ? 'Conversation Ended' : 'End Conversation'}
         </Button>
       </motion.div>
+      
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 mb-4 rounded-lg">
+          {error}
+        </div>
+      )}
       
       {/* Messages Container */}
       <Card className="flex-1 overflow-hidden">
@@ -167,15 +230,20 @@ export default function ConversationPage({ params }: { params: { id: string } })
             ref={messageContainerRef}
             className="h-full overflow-y-auto p-4 space-y-4"
           >
-            {conversation.messages.map((message) => (
+            {messages.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-sage-600">
+                Start a conversation by sending a message below.
+              </div>
+            ) : (
+              messages.map((message) => (
               <motion.div
                 key={message.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${message.is_from_user ? 'justify-end' : 'justify-start'}`}
               >
                 <div className="flex items-end max-w-[80%]">
-                  {!message.isUser && (
+                    {!message.is_from_user && (
                     <div className="w-8 h-8 rounded-full bg-sage-500 flex items-center justify-center mr-2 flex-shrink-0">
                       <span className="text-white font-semibold text-sm">A</span>
                     </div>
@@ -184,7 +252,7 @@ export default function ConversationPage({ params }: { params: { id: string } })
                   <div>
                     <div 
                       className={`p-3 rounded-lg ${
-                        message.isUser 
+                          message.is_from_user 
                           ? 'bg-sage-500 text-white rounded-br-none' 
                           : 'bg-cream-100 text-sage-800 rounded-bl-none'
                       }`}
@@ -192,70 +260,72 @@ export default function ConversationPage({ params }: { params: { id: string } })
                       {message.content}
                     </div>
                     <div className="text-xs text-sage-500 mt-1">
-                      {formatMessageTime(message.timestamp)}
+                        {formatMessageTime(message.created_at)}
                     </div>
                   </div>
                   
-                  {message.isUser && (
+                    {message.is_from_user && (
                     <div className="w-8 h-8 rounded-full bg-mist-500 flex items-center justify-center ml-2 flex-shrink-0">
                       <FiUser className="text-white" />
                     </div>
                   )}
                 </div>
               </motion.div>
-            ))}
+              ))
+            )}
             
-            {/* AI typing indicator */}
-            <AnimatePresence>
+            {/* AI Typing Indicator */}
               {isTyping && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="flex items-end max-w-[80%]">
+                <div className="flex items-end">
                     <div className="w-8 h-8 rounded-full bg-sage-500 flex items-center justify-center mr-2 flex-shrink-0">
                       <span className="text-white font-semibold text-sm">A</span>
                     </div>
                     
-                    <div className="p-3 rounded-lg bg-cream-100 text-sage-800 rounded-bl-none">
+                  <div className="bg-cream-100 p-3 rounded-lg rounded-bl-none">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-sage-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-sage-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-sage-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      <div className="w-2 h-2 bg-sage-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-sage-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-sage-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                       </div>
                     </div>
                   </div>
                 </motion.div>
               )}
-            </AnimatePresence>
           </div>
         )}
       </Card>
       
       {/* Message Input */}
-      <Card className="mt-4 p-2">
-        <div className="flex items-end">
+      <div className="mt-4">
+        <div className="flex">
           <textarea
-            className="flex-1 resize-none border-0 bg-transparent p-2 focus:ring-0 focus:outline-none text-sage-800 placeholder:text-sage-400"
+            className="flex-1 p-3 rounded-lg border border-cream-300 focus:outline-none focus:ring-2 focus:ring-sage-500 resize-none"
             placeholder="Type your message..."
             rows={1}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading || isTyping}
+            disabled={isLoading || isSending || isConversationEnded}
           />
           <Button 
-            size="sm" 
+            className="ml-2 flex-shrink-0" 
+            disabled={!newMessage.trim() || isLoading || isSending || isConversationEnded}
             onClick={handleSendMessage}
-            disabled={!newMessage.trim() || isLoading || isTyping}
-            className="rounded-full p-2"
           >
             <FiSend />
           </Button>
         </div>
-      </Card>
+        {isConversationEnded && (
+          <p className="text-sm text-sage-600 mt-2">
+            This conversation has ended. Start a new one from the conversations page.
+          </p>
+        )}
+      </div>
     </div>
   );
 } 

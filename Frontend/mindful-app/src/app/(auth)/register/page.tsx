@@ -7,11 +7,12 @@ import Link from 'next/link';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
+import { AxiosError } from 'axios';
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../components/ui/Card';
-import { Input } from '../../components/ui/Input';
-import { Button } from '../../components/ui/Button';
-import { register as registerUser, login } from '../../lib/api/auth';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../../../app/components/ui/Card';
+import { Input } from '../../../app/components/ui/Input';
+import { Button } from '../../../app/components/ui/Button';
+import { register as registerUser } from '../../../lib/api/auth';
 
 // Form validation schema
 const registerSchema = z.object({
@@ -48,23 +49,31 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      // Create a new user
-      const userData = {
-        first_name: data.first_name,
-        last_name: data.last_name,
+      // Format name for the register function (expects 'name')
+      const formattedName = `${data.first_name} ${data.last_name}`;
+      
+      // Register user
+      await registerUser({
+        name: formattedName,
         email: data.email,
-        password: data.password,
-      };
+        password: data.password
+      });
       
-      await registerUser(userData);
+      // Redirect to login page after successful registration
+      router.push('/login?registered=true');
+    } catch (err) {
+      console.error('Registration error:', err);
       
-      // Login automatically after registration
-      await login({ email: data.email, password: data.password });
-      
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch (err: any) {
+      if (err instanceof AxiosError) {
+        // Handle specific API errors
+        if (err.response?.status === 400 && err.response?.data?.detail?.includes('Email already registered')) {
+          setError('This email is already registered. Please try logging in instead.');
+        } else {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -9,50 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { MoodChart } from '../../components/mood/MoodChart';
 
-// Demo data for UI presentation
-const demoStats = {
-  totalSessions: 12,
-  nextSession: '2024-07-10T15:00:00',
-  completedHomework: 8,
-  totalHomework: 10,
-  moodTrend: 'positive',
-  lastConversation: '2024-07-08T16:23:00',
-  exercisesCompleted: 42,
-  lastExercise: '2024-07-09T08:30:00',
-};
-
-// Demo mood data
-const demoMoodData = [
-  { date: '2024-07-01', mood: 3, note: 'Feeling okay, a bit tired.' },
-  { date: '2024-07-02', mood: 4, note: 'Better day, meditation helped.' },
-  { date: '2024-07-03', mood: 3, note: 'Work stress returning.' },
-  { date: '2024-07-04', mood: 2, note: 'Difficult day, anxiety high.' },
-  { date: '2024-07-05', mood: 3, note: 'Slightly improved.' },
-  { date: '2024-07-06', mood: 4, note: 'Weekend relaxation helped.' },
-  { date: '2024-07-07', mood: 5, note: 'Feeling great today!' },
-];
-
-// Demo exercise data
-const recommendedExercises = [
-  {
-    id: '1',
-    title: 'Mindful Breathing',
-    duration: 5,
-    category: 'breathing',
-  },
-  {
-    id: '4',
-    title: '4-7-8 Breathing Technique',
-    duration: 3,
-    category: 'breathing',
-  },
-  {
-    id: '6',
-    title: 'Anxiety Relief Visualization',
-    duration: 12,
-    category: 'visualization',
-  },
-];
+import { 
+  getDashboardStats, 
+  getMoodHistory, 
+  getRecommendedExercises,
+  DashboardStats,
+  MoodData,
+  RecommendedExercise
+} from '../../../lib/api/dashboard';
 
 // Helper function to format date
 const formatDate = (dateStr: string) => {
@@ -67,7 +31,9 @@ const formatDate = (dateStr: string) => {
 };
 
 // Calculate days until next session
-const getDaysUntilNextSession = (dateStr: string) => {
+const getDaysUntilNextSession = (dateStr: string | null) => {
+  if (!dateStr) return 'No sessions scheduled';
+  
   const now = new Date();
   const nextSession = new Date(dateStr);
   const diffTime = Math.abs(nextSession.getTime() - now.getTime());
@@ -80,14 +46,37 @@ const getDaysUntilNextSession = (dateStr: string) => {
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [moodData, setMoodData] = useState<MoodData[]>([]);
+  const [exercises, setExercises] = useState<RecommendedExercise[]>([]);
   
-  // Simulate loading data
+  // Load dashboard data
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch stats, mood data, and exercises in parallel
+        const [statsData, moodHistoryData, exercisesData] = await Promise.all([
+          getDashboardStats(),
+          getMoodHistory('week'),
+          getRecommendedExercises(3)
+        ]);
+        
+        setStats(statsData);
+        setMoodData(moodHistoryData);
+        setExercises(exercisesData);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again.');
+      } finally {
       setIsLoading(false);
-    }, 1000);
+      }
+    };
     
-    return () => clearTimeout(timer);
+    fetchDashboardData();
   }, []);
   
   return (
@@ -101,6 +90,12 @@ export default function DashboardPage() {
         <h1 className="text-2xl md:text-3xl font-bold text-sage-800">Welcome back</h1>
         <p className="text-sage-600 mt-2">Here's your mental health journey at a glance</p>
       </div>
+      
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 mb-4 rounded-lg">
+          {error}
+        </div>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Session Card */}
@@ -116,7 +111,7 @@ export default function DashboardPage() {
               <div className="h-20 bg-cream-100 animate-pulse rounded-lg"></div>
             ) : (
               <div>
-                <div className="text-3xl font-bold text-sage-800">{demoStats.totalSessions}</div>
+                <div className="text-3xl font-bold text-sage-800">{stats?.total_sessions || 0}</div>
                 <p className="text-sage-600 text-sm mt-1">Sessions completed</p>
                 <div className="mt-4 bg-cream-100 h-2 rounded-full overflow-hidden">
                   <div className="bg-sage-500 h-full rounded-full" style={{ width: '60%' }}></div>
@@ -139,13 +134,24 @@ export default function DashboardPage() {
               <div className="h-20 bg-cream-100 animate-pulse rounded-lg"></div>
             ) : (
               <div>
-                <div className="text-sage-800 font-medium">{formatDate(demoStats.nextSession)}</div>
+                {stats?.next_session ? (
+                  <>
+                    <div className="text-sage-800 font-medium">{formatDate(stats.next_session)}</div>
                 <span className="text-sm px-2 py-1 bg-sage-100 text-sage-700 rounded-full inline-block mt-2">
-                  {getDaysUntilNextSession(demoStats.nextSession)}
+                      {getDaysUntilNextSession(stats.next_session)}
                 </span>
                 <div className="mt-4">
                   <Button variant="outline" size="sm">Reschedule</Button>
                 </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sage-800 font-medium">No sessions scheduled</div>
+                    <div className="mt-4">
+                      <Button variant="outline" size="sm">Schedule Session</Button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -165,13 +171,17 @@ export default function DashboardPage() {
             ) : (
               <div>
                 <div className="text-3xl font-bold text-sage-800">
-                  {demoStats.completedHomework}/{demoStats.totalHomework}
+                  {stats ? `${stats.completed_homework}/${stats.total_homework}` : '0/0'}
                 </div>
                 <p className="text-sage-600 text-sm mt-1">Assignments completed</p>
                 <div className="mt-4 bg-cream-100 h-2 rounded-full overflow-hidden">
                   <div 
                     className="bg-sage-500 h-full rounded-full" 
-                    style={{ width: `${(demoStats.completedHomework / demoStats.totalHomework) * 100}%` }}
+                    style={{ 
+                      width: stats ? 
+                        `${stats.total_homework > 0 ? (stats.completed_homework / stats.total_homework) * 100 : 0}%` : 
+                        '0%' 
+                    }}
                   ></div>
                 </div>
               </div>
@@ -193,10 +203,25 @@ export default function DashboardPage() {
             ) : (
               <div>
                 <p className="text-sage-700">Last conversation</p>
-                <div className="text-sage-800 font-medium">{formatDate(demoStats.lastConversation)}</div>
+                {stats?.last_conversation ? (
+                  <>
+                    <div className="text-sage-800 font-medium">{formatDate(stats.last_conversation)}</div>
+                    <div className="mt-4">
+                      <Link href="/dashboard/conversations">
+                        <Button variant="outline" size="sm">View Conversations</Button>
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sage-800 font-medium">No recent conversations</div>
                 <div className="mt-4">
-                  <Button variant="outline" size="sm">View Conversation</Button>
+                      <Link href="/dashboard/conversations">
+                        <Button variant="outline" size="sm">Start a Conversation</Button>
+                      </Link>
                 </div>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
@@ -222,7 +247,13 @@ export default function DashboardPage() {
               <div className="h-64 bg-cream-100 animate-pulse rounded-lg"></div>
             ) : (
               <div className="h-64">
-                <MoodChart data={demoMoodData} />
+                {moodData.length > 0 ? (
+                  <MoodChart data={moodData} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-sage-600">
+                    No mood data available yet. Start tracking your mood to see trends.
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -248,55 +279,28 @@ export default function DashboardPage() {
             Array(3).fill(0).map((_, i) => (
               <div key={i} className="h-32 bg-cream-100 animate-pulse rounded-lg"></div>
             ))
-          ) : (
-            recommendedExercises.map((exercise) => (
-              <Link href={`/dashboard/exercises/${exercise.id}`} key={exercise.id} className="block">
-                <Card className="h-full hover:shadow-md transition-shadow floating">
-                  <CardContent className="p-4 flex flex-col h-full">
-                    <h3 className="font-semibold text-sage-800">{exercise.title}</h3>
-                    <div className="flex items-center mt-2 mb-auto">
-                      <span className="text-xs font-medium bg-sage-100 text-sage-700 px-2 py-1 rounded-full flex items-center">
-                        <FiClock className="mr-1" size={12} /> {exercise.duration} min
+          ) : exercises.length > 0 ? (
+            exercises.map((exercise) => (
+              <Card key={exercise.id} className="h-full floating">
+                <CardContent className="p-5">
+                  <div className="flex flex-col h-full">
+                    <h3 className="font-medium text-sage-800">{exercise.title}</h3>
+                    <p className="text-sm text-sage-600 mt-1 flex-1">{exercise.description}</p>
+                    <div className="flex justify-between items-center mt-4">
+                      <span className="text-xs px-2 py-1 bg-cream-100 text-sage-700 rounded-full">
+                        {exercise.duration} min
                       </span>
-                      <span className="text-xs font-medium bg-cream-100 text-sage-700 px-2 py-1 rounded-full ml-2 capitalize">
-                        {exercise.category}
-                      </span>
+                      <Button variant="outline" size="sm">Start</Button>
                     </div>
-                    <div className="mt-auto pt-3">
-                      <Button size="sm" className="w-full flex items-center justify-center">
-                        <FiHeart className="mr-1" /> Start Exercise
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
             ))
+          ) : (
+            <div className="col-span-3 text-center py-10 text-sage-600">
+              No exercises available yet. Check back soon!
+            </div>
           )}
-        </div>
-      </div>
-      
-      {/* Quick Actions */}
-      <div className="mt-8">
-        <h2 className="text-xl font-semibold text-sage-800 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/dashboard/conversations" className="w-full">
-            <Button className="h-auto py-6 flex-col floating w-full" variant="outline">
-              <FiMessageSquare className="text-2xl mb-2" />
-              <span>Start Conversation</span>
-            </Button>
-          </Link>
-          
-          <Button className="h-auto py-6 flex-col floating-delayed" variant="outline">
-            <FiCalendar className="text-2xl mb-2" />
-            <span>Schedule Session</span>
-          </Button>
-          
-          <Link href="/dashboard/mood" className="w-full">
-            <Button className="h-auto py-6 flex-col floating w-full" variant="outline">
-              <FiActivity className="text-2xl mb-2" />
-              <span>Record Mood</span>
-            </Button>
-          </Link>
         </div>
       </div>
     </motion.div>

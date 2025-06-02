@@ -53,11 +53,24 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> Any:
         hashed_password=hashed_password,
         first_name=user_in.first_name,
         last_name=user_in.last_name,
+        profile_data=None  # Initialize with null profile_data
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    
+    # Create response object explicitly without profile to avoid validation errors
+    return {
+        "id": db_user.id,
+        "email": db_user.email,
+        "first_name": db_user.first_name,
+        "last_name": db_user.last_name,
+        "is_active": db_user.is_active,
+        "created_at": db_user.created_at,
+        "updated_at": db_user.updated_at,
+        "profile": None,
+        "session_schedules": []
+    }
 
 
 @router.get("/me", response_model=UserSchema)
@@ -70,7 +83,19 @@ def read_current_user(current_user: User = Depends(get_current_active_user)) -> 
     Returns:
         UserSchema: The current user.
     """
-    return current_user
+    # Create response object explicitly to avoid validation errors with profile
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "first_name": current_user.first_name,
+        "last_name": current_user.last_name,
+        "is_active": current_user.is_active,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
+        "profile": None,  # Explicitly set to None if not present
+        "session_schedules": []
+    }
 
 
 @router.post("/me/profile", response_model=UserProfileSchema)
@@ -148,6 +173,33 @@ def update_user_profile(
     
     db.commit()
     db.refresh(db_profile)
+    return db_profile
+
+
+@router.get("/me/profile", response_model=UserProfileSchema)
+def get_user_profile(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> Any:
+    """Get the current user's profile.
+    
+    Args:
+        current_user: The current authenticated user.
+        db: Database session.
+        
+    Returns:
+        UserProfileSchema: The user profile.
+        
+    Raises:
+        HTTPException: If the profile does not exist.
+    """
+    # Check if profile exists
+    db_profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    if not db_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found"
+        )
+    
     return db_profile
 
 
