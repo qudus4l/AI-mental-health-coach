@@ -56,6 +56,7 @@ class Message(Base):
         content: Text content of the message.
         is_from_user: Whether the message is from the user (vs. AI).
         created_at: When the message was created.
+        updated_at: When the message was last updated.
         is_transcript: Whether this message is a transcript of speech.
     """
     
@@ -67,6 +68,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     is_from_user = Column(Boolean, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_transcript = Column(Boolean, default=False, nullable=False)
     
     # Relationships
@@ -88,6 +90,7 @@ class ImportantMemory(Base):
         category: Category of the memory (triggers, coping_strategies, etc.).
         importance_score: AI-assigned importance score (0.0-1.0).
         created_at: When the memory was created.
+        updated_at: When the memory was last updated.
     """
     
     __tablename__ = "important_memories"
@@ -99,6 +102,7 @@ class ImportantMemory(Base):
     category = Column(String, nullable=True)
     importance_score = Column(Float, nullable=False, default=0.5)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="important_memories")

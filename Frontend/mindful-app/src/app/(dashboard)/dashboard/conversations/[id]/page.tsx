@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiArrowLeft, FiSend, FiCalendar, FiInfo, FiUser } from 'react-icons/fi';
+import { motion } from 'framer-motion';
+import { FiArrowLeft, FiSend, FiCalendar, FiUser } from 'react-icons/fi';
 
 import { Button } from '../../../../components/ui/Button';
 import { Card } from '../../../../components/ui/Card';
@@ -22,7 +22,7 @@ const formatMessageTime = (dateStr: string) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-export default function ConversationPage({ params }: { params: { id: string } }) {
+export default function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,9 +33,12 @@ export default function ConversationPage({ params }: { params: { id: string } })
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
   
+  // Unwrap params promise
+  const { id } = use(params);
+  
   // Load conversation and messages
   useEffect(() => {
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(id);
     if (isNaN(conversationId)) {
       setError('Invalid conversation ID');
       setIsLoading(false);
@@ -64,7 +67,7 @@ export default function ConversationPage({ params }: { params: { id: string } })
     };
     
     fetchConversation();
-  }, [params.id]);
+  }, [id]);
   
   // Scroll to bottom of messages when messages change
   useEffect(() => {
@@ -76,7 +79,7 @@ export default function ConversationPage({ params }: { params: { id: string } })
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !conversation || isSending) return;
     
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(id);
     if (isNaN(conversationId)) {
       setError('Invalid conversation ID');
       return;
@@ -127,7 +130,7 @@ export default function ConversationPage({ params }: { params: { id: string } })
   const handleEndConversation = async () => {
     if (!conversation) return;
     
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(id);
     if (isNaN(conversationId)) {
       setError('Invalid conversation ID');
       return;

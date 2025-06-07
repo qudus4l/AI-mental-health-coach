@@ -104,10 +104,10 @@ class ImportantMemoryCreate(ImportantMemoryBase):
     """Schema for creating a new important memory.
     
     Attributes:
-        source_message_id: Optional reference to the message that led to this memory.
+        conversation_id: Optional reference to the conversation this memory came from.
     """
     
-    source_message_id: Optional[int] = None
+    conversation_id: Optional[int] = None
 
 
 class ImportantMemory(ImportantMemoryBase):
@@ -116,7 +116,7 @@ class ImportantMemory(ImportantMemoryBase):
     Attributes:
         id: Primary key for the important memory.
         user_id: Foreign key reference to the associated user.
-        source_message_id: Optional reference to the message that led to this memory.
+        conversation_id: Optional reference to the conversation this memory came from.
         created_at: Timestamp when the memory was created.
         updated_at: Timestamp when the memory was last updated.
     """
@@ -125,6 +125,6 @@ class ImportantMemory(ImportantMemoryBase):
 
     id: int = Field(..., description="ID of the memory")
     user_id: int = Field(..., description="ID of the user")
-    source_message_id: Optional[int] = None
+    conversation_id: Optional[int] = None
     created_at: datetime = Field(..., description="When the memory was created")
     updated_at: datetime = Field(..., description="When the memory was last updated") 

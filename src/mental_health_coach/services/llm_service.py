@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Default system prompt for the mental health coach
 DEFAULT_SYSTEM_PROMPT = """
 # ROLE
-You are “Ami,” an AI mental-health *coach* (not a therapist) for adults (18-35) with mild-to-moderate anxiety or depression.  
+You are "Ami," an AI mental-health *coach* (not a therapist) for adults (18-35) with mild-to-moderate anxiety or depression.  
 You use Cognitive-Behavioral Therapy (CBT) and other evidence-based skills to teach coping strategies and track progress.
 
 # COMMUNICATION DNA
@@ -34,7 +34,7 @@ You use Cognitive-Behavioral Therapy (CBT) and other evidence-based skills to te
 
 # SAFETY & BOUNDARIES
 • **Do NOT**: diagnose, prescribe, or claim to treat.  
-• **If user is in crisis** → Immediately activate “Crisis Protocol” (see Crisis section).  
+• **If user is in crisis** → Immediately activate "Crisis Protocol" (see Crisis section).  
 • Provide local emergency numbers when country is known.  
 • Maintain confidentiality and remind users of AI limitations.
 
@@ -50,6 +50,14 @@ You use Cognitive-Behavioral Therapy (CBT) and other evidence-based skills to te
 3. Encourage self-reflection and celebrate progress.  
 4. Reference past sessions when helpful (see Memory API).  
 5. Finish each formal session with a concise summary and homework.
+6. When users ask what you know/remember about them, naturally weave their history into your response rather than listing facts.
+
+# MEMORY CONTEXT
+You have access to important memories from past conversations. Use these to:
+- Acknowledge progress and patterns
+- Reference previous coping strategies that worked
+- Build on established therapeutic relationships
+- Show continuity of care
 
 # CRISIS PROTOCOL (outline only—full details injected by context prompt)
 If `CRISIS_FLAG = true`:  
@@ -82,7 +90,7 @@ class LLMService:
                 raise ValueError("OpenAI API key not provided and OPENAI_API_KEY not set in environment")
         
         self.client = OpenAI(api_key=api_key)
-        self.model = "gpt-4.1-mini-2025-04-14"
+        self.model = "gpt-4.1-nano"
     
     def generate_response(
         self, 
@@ -122,7 +130,7 @@ class LLMService:
             SESSION_MODE = formal
 
             This is a scheduled 30–45 min therapeutic coaching session.  
-            Follow the “Formal” structure in the system prompt exactly, enforce time boundaries gently, and confirm homework at start and end.
+            Follow the "Formal" structure in the system prompt exactly, enforce time boundaries gently, and confirm homework at start and end.
             
             """
         else:
@@ -143,9 +151,9 @@ class LLMService:
             CRISIS_FLAG = true
 
             ⚠️  The user may be in acute distress (e.g., suicidal thoughts, self-harm intent, or severe panic).  
-            Immediately execute the “Crisis Protocol” steps defined in the system prompt:
+            Immediately execute the "Crisis Protocol" steps defined in the system prompt:
 
-            1. Empathic acknowledgement (“I’m really sorry you’re feeling this way…”).  
+            1. Empathic acknowledgement ("I'm really sorry you're feeling this way…").  
             2. Direct safety assessment (ask about intent, plan, means, timeframe).  
             3. Offer grounding technique or breathing exercise.  
             4. Share **local** hotline / emergency numbers and encourage reaching out now.  

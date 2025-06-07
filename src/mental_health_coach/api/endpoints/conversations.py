@@ -246,6 +246,42 @@ def create_message(
         
         message_history = [msg.content for msg in messages if msg.is_from_user and msg.id != db_message.id]
         
+        # Get relevant memories from the conversation memory service
+        memory_service = ConversationMemoryService(db=db, user=current_user)
+        
+        # Check if this is the first user message in the conversation
+        is_first_message = len([m for m in messages if m.is_from_user]) == 1
+        
+        # For first messages, always include recent important memories for context
+        # For subsequent messages, use semantic search but also include 1-2 high-importance memories
+        if is_first_message:
+            # Get top important memories to establish context
+            all_memories = memory_service.get_important_memories(limit=5, min_importance=0.7)
+            relevant_memories = []
+            for memory in all_memories:
+                relevant_memories.append({
+                    "content": memory.content,
+                    "category": memory.category,
+                    "importance_score": memory.importance_score,
+                    "created_at": memory.created_at.isoformat() if memory.created_at else None
+                })
+        else:
+            # Semantic search for relevant memories
+            relevant_memories = memory_service.retrieve_relevant_context(message_in.content, max_results=3)
+            
+            # Also include 1-2 high-importance memories for continuity
+            important_memories = memory_service.get_important_memories(limit=2, min_importance=0.8)
+            for memory in important_memories:
+                # Add if not already in relevant_memories
+                memory_dict = {
+                    "content": memory.content,
+                    "category": memory.category,
+                    "importance_score": memory.importance_score,
+                    "created_at": memory.created_at.isoformat() if memory.created_at else None
+                }
+                if not any(m.get("content") == memory.content for m in relevant_memories):
+                    relevant_memories.append(memory_dict)
+        
         # Detect potential crisis with enhanced context
         is_crisis, categories, resources, analysis_details = crisis_detector.detect_crisis(
             message_in.content, message_history, user_profile
@@ -296,10 +332,6 @@ def create_message(
                         "content": msg.content
                     })
             
-            # Get relevant memories from the conversation memory service
-            memory_service = ConversationMemoryService(db=db, user=current_user)
-            relevant_memories = memory_service.retrieve_relevant_context(message_in.content, max_results=3)
-            
             # Generate AI response using the LLM service
             ai_response_text = llm_service.generate_response(
                 user_message=message_in.content,
@@ -339,10 +371,10 @@ def create_message(
                     if importance_score > 0.6:  # Only save memories above a certain threshold
                         important_memory = ImportantMemory(
                             user_id=current_user.id,
+                            conversation_id=conversation_id,
                             content=memory_data['content'],
                             category=memory_data.get('category', 'insights'),
                             importance_score=importance_score,
-                            source_message_id=db_message.id,
                         )
                         db.add(important_memory)
                         db.commit()
@@ -354,13 +386,16 @@ def create_message(
     # Return the created message and additional information
     result = {
         "message": MessageSchema.model_validate(db_message),
-        "crisis_info": crisis_info,
-        "relevant_memories": relevant_memories if 'relevant_memories' in locals() else None,
+        "crisis_detected": is_crisis,
     }
+    
+    # Add crisis resources if detected
+    if crisis_info:
+        result["crisis_resources"] = crisis_info.get("resources", [])
     
     # If we generated an AI response automatically, include it in the result
     if message_in.is_from_user and ('ai_response' in locals()):
-        result["ai_response"] = MessageSchema.model_validate(ai_response)
+        result["ai_message"] = MessageSchema.model_validate(ai_response)
     
     return result
 
@@ -422,21 +457,20 @@ def create_important_memory(
     Raises:
         HTTPException: If the source message does not exist or does not belong to the user.
     """
-    # Validate source message if provided
-    if memory_in.source_message_id:
-        message = db.query(Message).filter(Message.id == memory_in.source_message_id).first()
-        if not message:
-            raise HTTPException(status_code=404, detail="Source message not found")
-        conversation = db.query(Conversation).filter(Conversation.id == message.conversation_id).first()
+    # Validate conversation if provided
+    if memory_in.conversation_id:
+        conversation = db.query(Conversation).filter(Conversation.id == memory_in.conversation_id).first()
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
         if conversation.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not enough permissions")
     
     db_memory = ImportantMemory(
         user_id=current_user.id,
+        conversation_id=memory_in.conversation_id,
         content=memory_in.content,
         category=memory_in.category,
         importance_score=memory_in.importance_score,
-        source_message_id=memory_in.source_message_id,
     )
     db.add(db_memory)
     db.commit()

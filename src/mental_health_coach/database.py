@@ -8,7 +8,7 @@ import logging
 from typing import Generator
 import sqlite3
 
-from sqlalchemy import create_engine, inspect, MetaData, Table, Column, Boolean, Text
+from sqlalchemy import create_engine, inspect, MetaData, Table, Column, Boolean, Text, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from dotenv import load_dotenv
@@ -53,71 +53,86 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def check_and_update_schema() -> None:
-    """Check for schema differences and update the database schema.
+    """Check and update database schema to match current models.
     
-    This function checks if the database schema matches the SQLAlchemy models
-    and adds missing columns if needed. This helps avoid errors when models
-    are updated but the database schema hasn't been migrated.
+    This function checks for missing columns and adds them if needed.
     """
+    from sqlalchemy import inspect, text
+    from datetime import datetime
+    
     inspector = inspect(engine)
     
-    # Check User table for is_verified column
-    if "users" in inspector.get_table_names():
-        columns = [col["name"] for col in inspector.get_columns("users")]
+    # Check users table
+    if 'users' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'is_verified' not in columns:
+            logger.info("Adding missing 'is_verified' column to users table")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT 0"))
+                conn.commit()
+            logger.info("Successfully added 'is_verified' column")
         
-        # Check for is_verified column
-        if "is_verified" not in columns:
-            logger.info("Adding missing column 'is_verified' to users table")
-            try:
-                # For SQLite, we need to use raw SQL for adding columns
-                if DATABASE_URL.startswith("sqlite"):
-                    conn = engine.connect()
-                    conn.execute("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT 0 NOT NULL")
-                    conn.commit()
-                    conn.close()
-                else:
-                    # For other databases, we can use SQLAlchemy's more abstract approach
-                    meta = MetaData()
-                    meta.reflect(bind=engine)
-                    users_table = Table('users', meta)
-                    
-                    column = Column('is_verified', Boolean, default=False, nullable=False)
-                    column_name = column.compile(dialect=engine.dialect)
-                    column_type = column.type.compile(engine.dialect)
-                    
-                    engine.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type} DEFAULT False NOT NULL')
-                
-                logger.info("Successfully added 'is_verified' column to users table")
-            except Exception as e:
-                logger.error(f"Failed to add column: {e}")
-                raise
+        if 'profile_data' not in columns:
+            logger.info("Adding missing 'profile_data' column to users table")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN profile_data TEXT"))
+                conn.commit()
+            logger.info("Successfully added 'profile_data' column")
+    
+    # Check messages table
+    if 'messages' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('messages')]
+        if 'is_transcript' not in columns:
+            logger.info("Adding missing 'is_transcript' column to messages table")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN is_transcript BOOLEAN DEFAULT 0"))
+                conn.commit()
+            logger.info("Successfully added 'is_transcript' column")
         
-        # Check for profile_data column
-        if "profile_data" not in columns:
-            logger.info("Adding missing column 'profile_data' to users table")
-            try:
-                # For SQLite, we need to use raw SQL for adding columns
-                if DATABASE_URL.startswith("sqlite"):
-                    conn = engine.connect()
-                    conn.execute("ALTER TABLE users ADD COLUMN profile_data TEXT")
-                    conn.commit()
-                    conn.close()
-                else:
-                    # For other databases, we can use SQLAlchemy's more abstract approach
-                    meta = MetaData()
-                    meta.reflect(bind=engine)
-                    users_table = Table('users', meta)
-                    
-                    column = Column('profile_data', Text, nullable=True)
-                    column_name = column.compile(dialect=engine.dialect)
-                    column_type = column.type.compile(engine.dialect)
-                    
-                    engine.execute(f'ALTER TABLE users ADD COLUMN {column_name} {column_type}')
-                
-                logger.info("Successfully added 'profile_data' column to users table")
-            except Exception as e:
-                logger.error(f"Failed to add column: {e}")
-                raise
+        if 'updated_at' not in columns:
+            logger.info("Adding missing 'updated_at' column to messages table")
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE messages ADD COLUMN updated_at TIMESTAMP DEFAULT '{datetime.utcnow().isoformat()}'"))
+                conn.commit()
+            logger.info("Successfully added 'updated_at' column to messages")
+    
+    # Check conversations table
+    if 'conversations' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('conversations')]
+        if 'updated_at' not in columns:
+            logger.info("Adding missing 'updated_at' column to conversations table")
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE conversations ADD COLUMN updated_at TIMESTAMP DEFAULT '{datetime.utcnow().isoformat()}'"))
+                conn.commit()
+            logger.info("Successfully added 'updated_at' column to conversations")
+    
+    # Check important_memories table
+    if 'important_memories' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('important_memories')]
+        
+        if 'conversation_id' not in columns:
+            logger.info("Adding missing 'conversation_id' column to important_memories table")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE important_memories ADD COLUMN conversation_id INTEGER"))
+                conn.commit()
+            logger.info("Successfully added 'conversation_id' column to important_memories")
+        
+        if 'updated_at' not in columns:
+            logger.info("Adding missing 'updated_at' column to important_memories table")
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE important_memories ADD COLUMN updated_at TIMESTAMP DEFAULT '{datetime.utcnow().isoformat()}'"))
+                conn.commit()
+            logger.info("Successfully added 'updated_at' column to important_memories")
+    
+    # Check assessments table
+    if 'assessments' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('assessments')]
+        if 'updated_at' not in columns:
+            logger.info("Adding missing 'updated_at' column to assessments table")
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE assessments ADD COLUMN updated_at TIMESTAMP DEFAULT '{datetime.utcnow().isoformat()}'"))
+                conn.commit()
+            logger.info("Successfully added 'updated_at' column to assessments")
 
 
 def apply_migrations() -> None:
