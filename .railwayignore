@@ -1,0 +1,47 @@
+# Frontend files (deploy separately)
+Frontend/
+frontend/
+*.next/
+node_modules/
+package.json
+package-lock.json
+
+# Development files
+tests/
+examples/
+scripts/
+*.db
+*.sqlite
+*.sqlite3
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Environment files
+.env
+.env.*
+env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.temp 
