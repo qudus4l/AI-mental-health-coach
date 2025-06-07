@@ -3,8 +3,12 @@
 This module sets up the FastAPI application, database, middleware, and routes.
 """
 
+import os
+from typing import Dict, Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from src.mental_health_coach.api import (
     auth, 
@@ -17,10 +21,13 @@ from src.mental_health_coach.api import (
     emergencies,
     assessments,
 )
-from src.mental_health_coach.database import Base, engine
+from src.mental_health_coach.database import Base, engine, init_db
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Load environment variables
+load_dotenv()
+
+# Initialize database
+init_db()
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,9 +37,13 @@ app = FastAPI(
 )
 
 # Configure CORS
+allowed_origins = os.getenv("FRONTEND_URL", "http://localhost:3000").split(",")
+if os.getenv("ENVIRONMENT") == "development":
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,10 +62,10 @@ app.include_router(assessments.router)
 
 
 @app.get("/", tags=["health"])
-async def health_check():
+async def health_check() -> Dict[str, Any]:
     """Basic health check endpoint.
     
     Returns:
-        Dictionary with service status.
+        Dict[str, Any]: Dictionary with service status.
     """
     return {"status": "ok", "service": "ai-mental-health-coach"} 

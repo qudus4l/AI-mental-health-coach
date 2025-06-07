@@ -1,0 +1,1 @@
+web: cd src && uvicorn mental_health_coach.main:app --host 0.0.0.0 --port $PORT 
