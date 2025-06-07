@@ -1,0 +1,77 @@
+# Frontend files
+Frontend/
+frontend/
+*.next/
+node_modules/
+package.json
+package-lock.json
+
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Development files
+examples/
+scripts/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.*
+env.example
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+.temp/
+
+# Build files
+build/
+dist/
+.eggs/
+
+# Railway specific
+.railwayignore
+railway.json
+.nixpacks.json
+nixpacks.toml
+build.sh 

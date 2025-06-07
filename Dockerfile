@@ -17,16 +17,16 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy only the backend code
-COPY src/ ./src/
-COPY pyproject.toml .
+# Copy the entire project structure
+COPY . .
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
 
 # Expose port (Railway will override this)
 EXPOSE 8000
 
 # Start the application
-CMD python -m uvicorn src.mental_health_coach.main:app --host 0.0.0.0 --port ${PORT:-8000} 
+CMD ["sh", "-c", "uvicorn src.mental_health_coach.main:app --host 0.0.0.0 --port ${PORT:-8000}"] 
