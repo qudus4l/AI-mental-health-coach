@@ -3,17 +3,19 @@
   "buildPlan": {
     "phases": {
       "setup": {
-        "nixPkgs": ["python310", "gcc", "postgresql"]
+        "nixPkgs": ["python310", "gcc", "postgresql"],
+        "aptPkgs": []
       },
       "install": {
+        "dependsOn": ["setup"],
         "cmds": [
-          "python -m pip install --upgrade pip",
+          "python -m pip install --upgrade pip setuptools wheel",
           "pip install -r requirements.txt"
         ]
       }
     }
   },
   "start": {
-    "cmd": "cd src && uvicorn mental_health_coach.main:app --host 0.0.0.0 --port $PORT"
+    "cmd": "cd src && python -m uvicorn mental_health_coach.main:app --host 0.0.0.0 --port ${PORT:-8000}"
   }
 } 
